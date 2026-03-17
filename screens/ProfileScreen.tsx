@@ -15,12 +15,14 @@ import * as ImagePicker from 'expo-image-picker';
 
 const screenWidth = Dimensions.get('window').width;
 
+type GarageItem = { id: string; uri: string };
+
 export default function ProfileScreen() {
-  const [garage, setGarage] = useState([]);
-  const [profilePic, setProfilePic] = useState(null);
+  const [garage, setGarage] = useState<GarageItem[]>([]);
+  const [profilePic, setProfilePic] = useState<string | null>(null);
   const [bio, setBio] = useState('Passionné de bolides japonais 🚗🇯🇵');
   const [modalVisible, setModalVisible] = useState(false);
-  const [selectedImage, setSelectedImage] = useState(null);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
   const pickGarageImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({ quality: 1 });
@@ -94,7 +96,7 @@ export default function ProfileScreen() {
       {/* Modal image en grand */}
       <Modal visible={modalVisible} transparent>
         <View style={styles.modalContainer}>
-          <Image source={{ uri: selectedImage }} style={styles.fullImage} />
+          {selectedImage ? <Image source={{ uri: selectedImage }} style={styles.fullImage} /> : null}
           <Text style={styles.imageCaption}>Cette voiture est dans mon garage 🏎️</Text>
           <Button title="Fermer" onPress={() => setModalVisible(false)} />
         </View>

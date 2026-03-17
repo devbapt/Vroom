@@ -6,7 +6,7 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "jsx": "react-jsx",
-    "moduleResolution": "nodenext",
+    "moduleResolution": "bundler",
     "noEmit": true
   },
   "include": ["**/*.ts", "**/*.tsx"],

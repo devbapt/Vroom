@@ -1,11 +1,7 @@
 import React from 'react';
-import { NavigationContainer } from '@react-navigation/native';
-import AppNavigator from './navigation/AppNavigator';
+import LoginScreen from './screens/LoginScreen'; 
 
 export default function App() {
-  return (
-    <NavigationContainer> // This is the main entry point of the app 
-      <AppNavigator />
-    </NavigationContainer>
-  );
+  // On affiche directement l'écran de connexion pour voir notre design !
+  return <LoginScreen />;
 }
