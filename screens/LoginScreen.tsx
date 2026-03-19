@@ -8,16 +8,16 @@ import {
   Platform,
   SafeAreaView,
   Pressable,
-  ActivityIndicator, // Pour le petit cercle de chargement
+  ActivityIndicator,
   Alert,
   type PressableStateCallbackType
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { supabase } from '../supabaseClient'; // 1. Importation du client
-
+import { supabase } from '../supabaseClient'; 
 
 import IconVroom from '../assets/icon_vroom_Couleur.svg';
 import TypoVroom from '../assets/typo_vroom_Blanc.svg';
+import GoogleLogo from '../assets/google_logo.svg';
 
 type PressableState = PressableStateCallbackType & { hovered?: boolean };
 
@@ -36,12 +36,12 @@ export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState(false); // 2. État pour le chargement
+  const [loading, setLoading] = useState(false); 
 
   const [isEmailFocused, setIsEmailFocused] = useState(false);
   const [isPasswordFocused, setIsPasswordFocused] = useState(false);
 
-  // 3. Fonction de connexion
+  // --- MODIFICATION ICI : Suppression du pop-up de succès ---
   const handleLogin = async () => {
     if (!email || !password) {
       const msg = "Veuillez remplir tous les champs.";
@@ -56,11 +56,11 @@ export default function LoginScreen() {
     });
 
     if (error) {
+      // On garde l'alerte d'erreur pour prévenir l'utilisateur s'il se trompe
       Platform.OS === 'web' ? alert(error.message) : Alert.alert("Erreur", error.message);
     } else {
-      const successMsg = "Connexion réussie ! Bienvenue sur Vroom.";
-      Platform.OS === 'web' ? alert(successMsg) : Alert.alert("Succès", successMsg);
-      // Ici, on naviguera vers le garage plus tard
+      // Plus de popup ! AppNavigator va détecter la connexion tout seul
+      console.log("Connexion réussie - Redirection en cours...");
     }
     setLoading(false);
   };
@@ -138,7 +138,7 @@ export default function LoginScreen() {
             <Text style={styles.forgotPassword}>Mot de passe oublié ?</Text>
           </Pressable>
 
-          {/* Bouton de Connexion mis à jour */}
+          {/* Bouton de Connexion */}
           <Pressable 
             onPress={handleLogin}
             disabled={loading}
@@ -163,15 +163,16 @@ export default function LoginScreen() {
           <View style={styles.line} />
         </View>
 
-        {/* Boutons Sociaux (Logique à venir) */}
-        <Pressable style={({ hovered }: any) => [styles.socialButton, styles.googleButton, hovered && { opacity: 0.8 }]}>
-          <Ionicons name="logo-google" size={20} color="#000" />
-          <Text style={styles.googleButtonText}>Google</Text>
-        </Pressable>
+        {/* Boutons Sociaux */}
 
         <Pressable style={({ hovered }: any) => [styles.socialButton, styles.appleButton, hovered && { backgroundColor: '#222' }]}>
           <Ionicons name="logo-apple" size={20} color="#FFF" />
-          <Text style={styles.appleButtonText}>Apple</Text>
+          <Text style={styles.appleButtonText}>Continuer avec Apple</Text>
+        </Pressable>
+        
+        <Pressable style={({ hovered }: any) => [styles.socialButton, styles.googleButton, hovered && { opacity: 0.8 }]}>
+          <GoogleLogo width={20} height={20} />
+          <Text style={styles.googleButtonText}>Continuer avec Google</Text>
         </Pressable>
 
         <View style={styles.footer}>
@@ -186,7 +187,6 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  // ... tes styles restent identiques
   safeArea: { flex: 1, backgroundColor: COLORS.bg },
   container: { flex: 1, paddingHorizontal: 25, justifyContent: 'center' },
   headerContainer: { alignItems: 'center', marginBottom: 50 },
