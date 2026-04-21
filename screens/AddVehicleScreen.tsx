@@ -17,7 +17,7 @@ import { Image as ExpoImage } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import ImageService from '../services/ImageService';
-import { useAppContext } from '../context/AppContext';
+import { useAppContext } from '../context';
 
 const { width } = Dimensions.get('window');
 

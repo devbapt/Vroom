@@ -17,7 +17,7 @@ import { Ionicons, Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { supabase } from '../supabaseClient';
-import { useAppContext } from '../context/AppContext';
+import { useAppContext } from '../context';
 import PostDetailModal from './PostDetailModal';
 import StoryViewer from './StoryViewer';
 import CreateStoryScreen from './CreateStoryScreen';
@@ -703,7 +703,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     paddingHorizontal: CONTAINER_PADDING,
-    justifyContent: 'space-between',
+    justifyContent: 'flex-start',
+    gap: GARAGE_GAP,
     marginBottom: GARAGE_GAP,
   },
   garageItem: {

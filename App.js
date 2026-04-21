@@ -1,5 +1,5 @@
 import React from 'react';
-import { AppProvider } from './context/AppContext';
+import { AppProvider } from './context';
 import AppNavigator from './navigation/AppNavigator';
 
 export default function App() {

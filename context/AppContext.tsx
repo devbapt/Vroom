@@ -69,7 +69,7 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider = ({ children }: { children: ReactNode }) => {
   // User Profile
-  const [user, setUser] = useState<UserProfile>({
+  const [user, setUser] = useState<UserProfile | null>({
     id: 'user_123',
     username: 'bapti_vroom',
     displayName: 'Baptiste',
@@ -91,12 +91,12 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   // Posts (Garage)
   const [posts, setPosts] = useState<Post[]>([
-    { id: '1', title: 'Ferrari F8', image: 'https://images.unsplash.com/photo-1592198084033-aade902d1aae?w=400&h=400&fit=crop', likes: 124, comments: 8, shares: 12 },
-    { id: '2', title: 'Porsche 911', image: 'https://cdn.pixabay.com/photo/2020/07/28/08/29/porsche-911-5444317_640.jpg', likes: 210, comments: 15, shares: 24 },
-    { id: '3', title: 'McLaren 720S', image: 'https://images.unsplash.com/photo-1620882814836-98a2bc903323?w=400&h=400&fit=crop', likes: 340, comments: 22, shares: 45 },
-    { id: '4', title: 'Lamborghini', image: 'https://images.unsplash.com/photo-1544636331-e26879cd3d9a?w=400&h=400&fit=crop', likes: 520, comments: 35, shares: 78 },
-    { id: '5', title: 'Aston Martin', image: 'https://images.unsplash.com/photo-1603584173870-7f23fdae1b7a?w=400&h=400&fit=crop', likes: 189, comments: 11, shares: 18 },
-    { id: '6', title: 'Mercedes AMG', image: 'https://images.unsplash.com/photo-1618843479313-40f8afb4b4d8?w=400&h=400&fit=crop', likes: 267, comments: 19, shares: 32 },
+    { id: '1', title: 'Ferrari F8', image: 'https://images.unsplash.com/photo-1592198084033-aade902d1aae?w=500&h=500&fit=crop', likes: 124, comments: 8, shares: 12 },
+    { id: '2', title: 'Porsche 911', image: 'https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=500&h=500&fit=crop', likes: 210, comments: 15, shares: 24 },
+    { id: '3', title: 'McLaren 720S', image: 'https://images.unsplash.com/photo-1620882814836-98a2bc903323?w=500&h=500&fit=crop', likes: 340, comments: 22, shares: 45 },
+    { id: '4', title: 'Lamborghini', image: 'https://images.unsplash.com/photo-1567818735868-e71b99932e29?w=500&h=500&fit=crop', likes: 520, comments: 35, shares: 78 },
+    { id: '5', title: 'Aston Martin', image: 'https://images.unsplash.com/photo-1609708536965-9e47b79e1ad7?w=500&h=500&fit=crop', likes: 189, comments: 11, shares: 18 },
+    { id: '6', title: 'Mercedes AMG', image: 'https://images.unsplash.com/photo-1542282088-fe8426682b8f?w=500&h=500&fit=crop', likes: 267, comments: 19, shares: 32 },
   ]);
 
   // Notifications

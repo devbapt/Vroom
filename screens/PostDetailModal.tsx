@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { Ionicons, Feather } from '@expo/vector-icons';
-import { useAppContext } from '../context/AppContext';
+import { useAppContext } from '../context';
 
 const { width, height } = Dimensions.get('window');
 
