@@ -7,15 +7,12 @@ import {
   SafeAreaView,
   ScrollView,
   Switch,
-  Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { supabase } from '../supabaseClient';
+import { useAppContext } from '../context/AppContext';
+import { getTranslation, Language } from '../i18n';
 
-const { width } = Dimensions.get('window');
-
-// --- Colors ---
 const VROOM_COLORS = {
   bg: '#FFFFFF',
   dark: '#140102',
@@ -27,48 +24,77 @@ const VROOM_COLORS = {
 
 const CONTAINER_PADDING = 16;
 
-type SettingsScreenProps = {
-  navigation: any;
-};
+type SettingsScreenProps = { navigation: any };
 
 export default function SettingsScreen({ navigation }: SettingsScreenProps) {
   const [pushNotifications, setPushNotifications] = useState(true);
   const [emailNotifications, setEmailNotifications] = useState(false);
   const [privateAccount, setPrivateAccount] = useState(false);
-  const insets = useSafeAreaInsets();
+  const { language, setLanguage } = useAppContext();
+  const t = getTranslation(language);
 
   const handleLogout = async () => {
     const { error } = await supabase.auth.signOut();
-    if (error) {
-      alert('Logout error: ' + error.message);
-    }
+    if (error) alert('Erreur : ' + error.message);
   };
+
+  const handleLanguageChange = (lang: Language) => setLanguage(lang);
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* === HEADER === */}
+      {/* Header */}
       <View style={styles.header}>
         <Pressable onPress={() => navigation.goBack()} hitSlop={15}>
-          <Ionicons name="chevron-down" size={32} color={VROOM_COLORS.dark} />
+          <Ionicons name="chevron-down" size={30} color={VROOM_COLORS.dark} />
         </Pressable>
-        <Text style={styles.headerTitle}>Settings</Text>
-        <View style={{ width: 32 }} />
+        <Text style={styles.headerTitle}>{t.settings.title}</Text>
+        <View style={{ width: 30 }} />
       </View>
 
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-      >
-        {/* === ACCOUNT SECTION === */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Account</Text>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
 
+        {/* === LANGUE === */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>{t.settings.language.toUpperCase()}</Text>
           <View style={styles.sectionContent}>
-            {/* Private Account */}
+            <Pressable
+              style={({ pressed }) => [styles.settingRow, pressed && { backgroundColor: VROOM_COLORS.fieldBg }]}
+              onPress={() => handleLanguageChange('fr')}
+            >
+              <View style={styles.settingInfo}>
+                <Text style={styles.settingLabel}>{t.settings.french}</Text>
+                <Text style={styles.settingHint}>{t.settings.language_hint}</Text>
+              </View>
+              {language === 'fr' && (
+                <Ionicons name="checkmark-circle" size={20} color={VROOM_COLORS.accent} />
+              )}
+            </Pressable>
+
+            <View style={styles.divider} />
+
+            <Pressable
+              style={({ pressed }) => [styles.settingRow, pressed && { backgroundColor: VROOM_COLORS.fieldBg }]}
+              onPress={() => handleLanguageChange('en')}
+            >
+              <View style={styles.settingInfo}>
+                <Text style={styles.settingLabel}>{t.settings.english}</Text>
+                <Text style={styles.settingHint}>Choose English as app language</Text>
+              </View>
+              {language === 'en' && (
+                <Ionicons name="checkmark-circle" size={20} color={VROOM_COLORS.accent} />
+              )}
+            </Pressable>
+          </View>
+        </View>
+
+        {/* === COMPTE === */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>{t.settings.account}</Text>
+          <View style={styles.sectionContent}>
             <View style={styles.settingRow}>
               <View style={styles.settingInfo}>
-                <Text style={styles.settingLabel}>Private Account</Text>
-                <Text style={styles.settingHint}>Control who can see your posts</Text>
+                <Text style={styles.settingLabel}>{t.settings.private_account}</Text>
+                <Text style={styles.settingHint}>{t.settings.private_hint}</Text>
               </View>
               <Switch
                 value={privateAccount}
@@ -80,29 +106,26 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
 
             <View style={styles.divider} />
 
-            {/* Change Password */}
             <Pressable
               style={({ pressed }) => [styles.settingRow, pressed && { backgroundColor: VROOM_COLORS.fieldBg }]}
             >
               <View style={styles.settingInfo}>
-                <Text style={styles.settingLabel}>Change Password</Text>
-                <Text style={styles.settingHint}>Update your security</Text>
+                <Text style={styles.settingLabel}>{t.settings.change_password}</Text>
+                <Text style={styles.settingHint}>{t.settings.change_password_hint}</Text>
               </View>
-              <Ionicons name="chevron-forward" size={20} color={VROOM_COLORS.muted} />
+              <Ionicons name="chevron-forward" size={18} color={VROOM_COLORS.muted} />
             </Pressable>
           </View>
         </View>
 
-        {/* === NOTIFICATIONS SECTION === */}
+        {/* === NOTIFICATIONS === */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Notifications</Text>
-
+          <Text style={styles.sectionTitle}>{t.settings.notifications_section}</Text>
           <View style={styles.sectionContent}>
-            {/* Push Notifications */}
             <View style={styles.settingRow}>
               <View style={styles.settingInfo}>
-                <Text style={styles.settingLabel}>Push Notifications</Text>
-                <Text style={styles.settingHint}>Get notified about activity</Text>
+                <Text style={styles.settingLabel}>{t.settings.push}</Text>
+                <Text style={styles.settingHint}>{t.settings.push_hint}</Text>
               </View>
               <Switch
                 value={pushNotifications}
@@ -114,11 +137,10 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
 
             <View style={styles.divider} />
 
-            {/* Email Notifications */}
             <View style={styles.settingRow}>
               <View style={styles.settingInfo}>
-                <Text style={styles.settingLabel}>Email Notifications</Text>
-                <Text style={styles.settingHint}>Receive emails about updates</Text>
+                <Text style={styles.settingLabel}>{t.settings.email}</Text>
+                <Text style={styles.settingHint}>{t.settings.email_hint}</Text>
               </View>
               <Switch
                 value={emailNotifications}
@@ -130,59 +152,54 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
           </View>
         </View>
 
-        {/* === HELP SECTION === */}
+        {/* === AIDE === */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Help & Support</Text>
-
+          <Text style={styles.sectionTitle}>{t.settings.help_section}</Text>
           <View style={styles.sectionContent}>
-            {/* About */}
             <Pressable
               style={({ pressed }) => [styles.settingRow, pressed && { backgroundColor: VROOM_COLORS.fieldBg }]}
             >
               <View style={styles.settingInfo}>
-                <Text style={styles.settingLabel}>About Vroom</Text>
-                <Text style={styles.settingHint}>Version 1.0.0</Text>
+                <Text style={styles.settingLabel}>{t.settings.about}</Text>
+                <Text style={styles.settingHint}>{t.settings.version}</Text>
               </View>
-              <Ionicons name="chevron-forward" size={20} color={VROOM_COLORS.muted} />
+              <Ionicons name="chevron-forward" size={18} color={VROOM_COLORS.muted} />
             </Pressable>
 
             <View style={styles.divider} />
 
-            {/* Contact Support */}
             <Pressable
               style={({ pressed }) => [styles.settingRow, pressed && { backgroundColor: VROOM_COLORS.fieldBg }]}
             >
               <View style={styles.settingInfo}>
-                <Text style={styles.settingLabel}>Contact Support</Text>
-                <Text style={styles.settingHint}>Get help from our team</Text>
+                <Text style={styles.settingLabel}>{t.settings.support}</Text>
+                <Text style={styles.settingHint}>{t.settings.support_hint}</Text>
               </View>
-              <Ionicons name="chevron-forward" size={20} color={VROOM_COLORS.muted} />
+              <Ionicons name="chevron-forward" size={18} color={VROOM_COLORS.muted} />
             </Pressable>
 
             <View style={styles.divider} />
 
-            {/* Terms & Privacy */}
             <Pressable
               style={({ pressed }) => [styles.settingRow, pressed && { backgroundColor: VROOM_COLORS.fieldBg }]}
             >
               <View style={styles.settingInfo}>
-                <Text style={styles.settingLabel}>Terms & Privacy</Text>
-                <Text style={styles.settingHint}>Our policies and terms</Text>
+                <Text style={styles.settingLabel}>{t.settings.terms}</Text>
+                <Text style={styles.settingHint}>{t.settings.terms_hint}</Text>
               </View>
-              <Ionicons name="chevron-forward" size={20} color={VROOM_COLORS.muted} />
+              <Ionicons name="chevron-forward" size={18} color={VROOM_COLORS.muted} />
             </Pressable>
           </View>
         </View>
 
-        {/* === DANGER ZONE === */}
+        {/* Déconnexion */}
         <View style={[styles.section, { marginBottom: 40 }]}>
-          {/* Logout Button */}
           <Pressable
             onPress={handleLogout}
             style={({ pressed }) => [styles.logoutBtn, pressed && { opacity: 0.7 }]}
           >
-            <Ionicons name="log-out" size={20} color="#FFFFFF" />
-            <Text style={styles.logoutBtnText}>Sign Out</Text>
+            <Ionicons name="log-out-outline" size={18} color="#FFFFFF" />
+            <Text style={styles.logoutBtnText}>{t.settings.sign_out}</Text>
           </Pressable>
         </View>
       </ScrollView>
@@ -191,12 +208,7 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: VROOM_COLORS.bg,
-  },
-
-  // === HEADER ===
+  container: { flex: 1, backgroundColor: VROOM_COLORS.bg },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -206,27 +218,15 @@ const styles = StyleSheet.create({
     borderBottomWidth: 0.5,
     borderBottomColor: VROOM_COLORS.border,
   },
-  headerTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: VROOM_COLORS.dark,
-  },
-
-  // === SCROLL ===
-  scrollContent: {
-    paddingVertical: 20,
-  },
-
-  // === SECTIONS ===
-  section: {
-    marginBottom: 28,
-  },
+  headerTitle: { fontSize: 15, fontWeight: '600', color: VROOM_COLORS.dark },
+  scrollContent: { paddingVertical: 20 },
+  section: { marginBottom: 26 },
   sectionTitle: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
     color: VROOM_COLORS.muted,
     paddingHorizontal: CONTAINER_PADDING,
-    marginBottom: 12,
+    marginBottom: 10,
     letterSpacing: 0.5,
   },
   sectionContent: {
@@ -236,52 +236,30 @@ const styles = StyleSheet.create({
     borderTopColor: VROOM_COLORS.border,
     borderBottomColor: VROOM_COLORS.border,
   },
-
-  // === SETTING ROW ===
   settingRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 14,
+    paddingVertical: 12,
     paddingHorizontal: CONTAINER_PADDING,
   },
-  settingInfo: {
-    flex: 1,
-    marginRight: 12,
-  },
-  settingLabel: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: VROOM_COLORS.dark,
-    marginBottom: 4,
-  },
-  settingHint: {
-    fontSize: 12,
-    color: VROOM_COLORS.muted,
-    fontWeight: '400',
-  },
-
-  // === DIVIDER ===
+  settingInfo: { flex: 1, marginRight: 12 },
+  settingLabel: { fontSize: 14, fontWeight: '500', color: VROOM_COLORS.dark, marginBottom: 2 },
+  settingHint: { fontSize: 11, color: VROOM_COLORS.muted },
   divider: {
     height: 0.5,
     backgroundColor: VROOM_COLORS.border,
     marginHorizontal: CONTAINER_PADDING,
   },
-
-  // === LOGOUT BUTTON ===
   logoutBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 10,
+    gap: 8,
     backgroundColor: VROOM_COLORS.accent,
     marginHorizontal: CONTAINER_PADDING,
-    paddingVertical: 14,
+    paddingVertical: 13,
     borderRadius: 8,
   },
-  logoutBtnText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
+  logoutBtnText: { fontSize: 14, fontWeight: '600', color: '#FFFFFF' },
 });

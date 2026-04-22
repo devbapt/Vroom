@@ -1,8 +1,9 @@
 import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+import { Language } from '../i18n';
 
 /**
  * App Context - Global state management (MVC Model Layer)
- * Handles: profile, stories, posts, user data
+ * Handles: profile, stories, posts, user data, language
  */
 
 export interface Highlight {
@@ -31,6 +32,12 @@ export interface Post {
   isSaved?: boolean;
 }
 
+export interface ProfileTag {
+  id: string;
+  label: string;
+  type: 'brand' | 'place' | 'location';
+}
+
 export interface UserProfile {
   id: string;
   username: string;
@@ -41,6 +48,7 @@ export interface UserProfile {
   followingCount: number;
   postsCount: number;
   isPrivate: boolean;
+  tags?: ProfileTag[];
 }
 
 export interface AppContextType {
@@ -63,6 +71,10 @@ export interface AppContextType {
   // Notifications & Feed
   unreadCount: number;
   markAsRead: () => void;
+
+  // Language
+  language: Language;
+  setLanguage: (lang: Language) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -74,11 +86,17 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     username: 'bapti_vroom',
     displayName: 'Baptiste',
     avatar: 'https://i.pravatar.cc/150?img=12',
-    bio: 'Car enthusiast | Porsche lover | Track days',
+    bio: 'Passionné de GT & Vintage 🏁 Track day addict · Roadtrips sur route de montagne',
     followersCount: 1200,
     followingCount: 350,
     postsCount: 6,
     isPrivate: false,
+    tags: [
+      { id: 't1', label: 'Porsche', type: 'brand' as const },
+      { id: 't2', label: 'Ferrari', type: 'brand' as const },
+      { id: 't3', label: 'Circuit SPA', type: 'place' as const },
+      { id: 't4', label: 'Lyon FR', type: 'location' as const },
+    ],
   });
 
   // Highlights
@@ -101,6 +119,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   // Notifications
   const [unreadCount, setUnreadCount] = useState(5);
+
+  // Language
+  const [language, setLanguageState] = useState<Language>('fr');
 
   // Profile updates
   const updateProfile = useCallback((profileUpdate: Partial<UserProfile>) => {
@@ -145,6 +166,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     setUnreadCount(0);
   }, []);
 
+  const changeLanguage = useCallback((lang: Language) => {
+    setLanguageState(lang);
+  }, []);
+
   const value: AppContextType = {
     user,
     updateProfile,
@@ -158,6 +183,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     deletePost,
     unreadCount,
     markAsRead,
+    language,
+    setLanguage: changeLanguage,
   };
 
   return (
@@ -167,9 +194,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   );
 };
 
-/**
- * Hook to use app context
- */
 export const useAppContext = (): AppContextType => {
   const context = useContext(AppContext);
   if (!context) {

@@ -1,3 +1,3 @@
 // Re-export all context exports
-export * from './AppContext.tsx';
-export type * from './AppContext.tsx';
+export * from './AppContext';
+export type * from './AppContext';
