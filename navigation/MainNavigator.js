@@ -1,10 +1,10 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
-import { Platform, SafeAreaView } from 'react-native';
+import { View, Platform, SafeAreaView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import HomeScreen from '../screens/HomeScreen';
+import HomeStackNavigator from './HomeStackNavigator';
 import MapScreen from '../screens/MapScreen';
 import SearchScreen from '../screens/SearchScreen';
 import MessagesScreen from '../screens/MessagesScreen';
@@ -43,14 +43,21 @@ export default function MainNavigator() {
           else if (route.name === 'Search') iconName = focused ? 'search' : 'search-outline';
           else if (route.name === 'Messages') iconName = focused ? 'chatbubble' : 'chatbubble-outline';
           else if (route.name === 'Profile') iconName = focused ? 'person' : 'person-outline';
-          
-          return <Ionicons name={iconName} size={size} color={color} />;
+
+          return (
+            <View style={{ alignItems: 'center' }}>
+              <Ionicons name={iconName} size={size} color={color} />
+              {focused && (
+                <View style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: '#E50914', marginTop: 3 }} />
+              )}
+            </View>
+          );
         },
-        tabBarActiveTintColor: '#E50914', // Racing Red Vroom
-        tabBarInactiveTintColor: '#8E8E93', // Gris standard
-        tabBarStyle: { 
-          backgroundColor: '#FFFFFF', 
-          borderTopColor: '#EEEEEE',
+        tabBarActiveTintColor: '#E50914',
+        tabBarInactiveTintColor: 'rgba(255,255,255,0.4)',
+        tabBarStyle: {
+          backgroundColor: '#140102',
+          borderTopColor: 'rgba(255,255,255,0.08)',
           borderTopWidth: 0.5,
           height: Platform.OS === 'ios' ? 60 + insets.bottom : 60,
           paddingBottom: Platform.OS === 'ios' ? insets.bottom : 8,
@@ -71,7 +78,7 @@ export default function MainNavigator() {
         },
       })}
     >
-      <Tab.Screen name="Home" component={HomeScreen} />
+      <Tab.Screen name="Home" component={HomeStackNavigator} />
       <Tab.Screen name="Maps" component={MapScreen} />
       <Tab.Screen name="Search" component={SearchScreen} />
       <Tab.Screen name="Messages" component={MessagesScreen} />
