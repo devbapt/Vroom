@@ -1,212 +1,263 @@
-import React from 'react';
+import React, { memo } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   Pressable,
-  SafeAreaView,
   FlatList,
   Dimensions,
+  ListRenderItemInfo,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image as ExpoImage } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
+import { useAppContext } from '../context';
+import type { CineDrivePost } from '../context/AppContext';
 
-const { width } = Dimensions.get('window');
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-// --- Colors ---
-const VROOM_COLORS = {
-  bg: '#FFFFFF',
-  dark: '#140102',
+const C = {
+  bg: '#140102',
   accent: '#E50914',
-  muted: '#8E8E93',
-  fieldBg: 'rgba(20, 1, 2, 0.05)',
-  border: '#EEEEEE',
+  white: '#FFFFFF',
+  whiteSoft: 'rgba(255,255,255,0.6)',
+  whiteFaint: 'rgba(255,255,255,0.15)',
+  surface: 'rgba(255,255,255,0.05)',
 };
 
-const CONTAINER_PADDING = 16;
-const FALLBACK_IMAGE = require('../assets/logo_vroom_Couleur.png');
+const MONO = 'Courier';
+const GRID_GAP = 2;
+const GRID_COLS = 2;
+const ITEM_SIZE = (SCREEN_WIDTH - GRID_GAP) / GRID_COLS;
 
-// Mock saved posts data
-const SAVED_POSTS = [
-  {
-    id: '1',
-    title: 'Ferrari F8',
-    image: 'https://images.unsplash.com/photo-1592198084033-aade902d1aae?w=400&h=400&fit=crop',
-    user: '@CarEnthusiast',
-    likes: 1240,
-  },
-  {
-    id: '2',
-    title: 'Porsche 911',
-    image: 'https://cdn.pixabay.com/photo/2020/07/28/08/29/porsche-911-5444317_640.jpg',
-    user: '@SpeedDemon',
-    likes: 2100,
-  },
-  {
-    id: '3',
-    title: 'McLaren 720S',
-    image: 'https://images.unsplash.com/photo-1620882814836-98a2bc903323?w=400&h=400&fit=crop',
-    user: '@MotorHead',
-    likes: 3400,
-  },
-  {
-    id: '4',
-    title: 'Lamborghini Huracán',
-    image: 'https://images.unsplash.com/photo-1544636331-e26879cd3d9a?w=400&h=400&fit=crop',
-    user: '@GearGuru',
-    likes: 5200,
-  },
-  {
-    id: '5',
-    title: 'Aston Martin DBS',
-    image: 'https://images.unsplash.com/photo-1603584173870-7f23fdae1b7a?w=400&h=400&fit=crop',
-    user: '@AutoLover',
-    likes: 1890,
-  },
-];
+type SavedScreenProps = { navigation: any };
 
-const GRID_COLUMNS = 2;
-const GAP = 2;
-const ITEM_SIZE = (width - CONTAINER_PADDING * 2 - GAP) / GRID_COLUMNS;
-
-type SavedScreenProps = {
-  navigation: any;
-};
-
-export default function SavedScreen({ navigation }: SavedScreenProps) {
-  const renderSavedItem = ({ item }: { item: typeof SAVED_POSTS[0] }) => (
-    <Pressable style={({ pressed }) => [styles.savedItem, pressed && { opacity: 0.7 }]}>
+const SavedItem = memo(function SavedItem({ item, onUnsave }: { item: CineDrivePost; onUnsave: (id: string) => void }) {
+  const thumb = item.photos?.[0] ?? item.image;
+  return (
+    <Pressable style={({ pressed }) => [styles.item, pressed && { opacity: 0.85 }]}>
       <ExpoImage
-        source={item.image}
-        style={styles.savedImage}
-        placeholder={FALLBACK_IMAGE}
+        source={thumb}
+        style={styles.itemImage}
         contentFit="cover"
+        cachePolicy="memory-disk"
       />
-      <View style={styles.savedOverlay}>
-        <View style={styles.savedInfo}>
-          <Text style={styles.savedTitle} numberOfLines={1}>
-            {item.title}
-          </Text>
-          <Text style={styles.savedUser} numberOfLines={1}>
-            {item.user}
-          </Text>
+      <View style={styles.itemOverlay}>
+        <View style={styles.typeBadge}>
+          <Text style={styles.typeBadgeText}>{item.type.replace('_', ' ').toUpperCase()}</Text>
         </View>
-        <View style={styles.likesBadge}>
-          <Ionicons name="heart" size={14} color="#FFFFFF" />
-          <Text style={styles.likesCount}>{item.likes}</Text>
+        <Pressable
+          style={styles.unsaveBtn}
+          onPress={() => onUnsave(item.id)}
+          hitSlop={8}
+        >
+          <Ionicons name="bookmark" size={16} color={C.accent} />
+        </Pressable>
+      </View>
+      <View style={styles.itemInfo}>
+        <Text style={styles.itemVehicle} numberOfLines={1}>
+          {item.vehicle.brand} {item.vehicle.model}
+        </Text>
+        <Text style={styles.itemUser} numberOfLines={1}>
+          @{item.user.username}
+        </Text>
+        <View style={styles.likeRow}>
+          <Ionicons name="heart" size={11} color={C.accent} />
+          <Text style={styles.likeCount}>{item.likes >= 1000 ? (item.likes / 1000).toFixed(1) + 'k' : item.likes}</Text>
         </View>
       </View>
     </Pressable>
   );
+});
+
+export default function SavedScreen({ navigation }: SavedScreenProps) {
+  const insets = useSafeAreaInsets();
+  const { savedCinePosts, toggleSaveCinePost } = useAppContext();
+
+  const renderItem = ({ item }: ListRenderItemInfo<CineDrivePost>) => (
+    <SavedItem item={item} onUnsave={toggleSaveCinePost} />
+  );
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* === HEADER === */}
+    <View style={[styles.root, { paddingTop: insets.top }]}>
+      {/* Header */}
       <View style={styles.header}>
         <Pressable onPress={() => navigation.goBack()} hitSlop={15}>
-          <Ionicons name="chevron-down" size={32} color={VROOM_COLORS.dark} />
+          <Ionicons name="chevron-down" size={28} color={C.white} />
         </Pressable>
-        <Text style={styles.headerTitle}>Saved</Text>
-        <View style={{ width: 32 }} />
+        <View style={styles.headerCenter}>
+          <View style={styles.accentBar} />
+          <Text style={styles.headerTitle}>ENREGISTRÉS</Text>
+        </View>
+        <Text style={styles.headerCount}>{savedCinePosts.length}</Text>
       </View>
 
-      {/* === GRID === */}
+      {/* Grid */}
       <FlatList
-        data={SAVED_POSTS}
+        data={savedCinePosts}
         keyExtractor={(item) => item.id}
-        renderItem={renderSavedItem}
-        numColumns={GRID_COLUMNS}
-        scrollEnabled={true}
-        contentContainerStyle={styles.gridContent}
-        columnWrapperStyle={styles.columnWrapper}
-        ItemSeparatorComponent={() => <View style={{ height: GAP }} />}
+        renderItem={renderItem}
+        numColumns={GRID_COLS}
+        columnWrapperStyle={styles.gridRow}
+        ItemSeparatorComponent={() => <View style={{ height: GRID_GAP }} />}
+        contentContainerStyle={[styles.gridContent, { paddingBottom: insets.bottom + 16 }]}
+        showsVerticalScrollIndicator={false}
+        ListEmptyComponent={<EmptyState />}
       />
-    </SafeAreaView>
+    </View>
+  );
+}
+
+function EmptyState() {
+  return (
+    <View style={styles.empty}>
+      <Ionicons name="bookmark-outline" size={48} color={C.whiteFaint} />
+      <Text style={styles.emptyTitle}>Aucun post enregistré</Text>
+      <Text style={styles.emptySubtitle}>
+        Appuie sur{' '}
+        <Ionicons name="bookmark-outline" size={12} color={C.whiteSoft} />
+        {' '}dans le feed pour sauvegarder des posts
+      </Text>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  root: {
     flex: 1,
-    backgroundColor: VROOM_COLORS.bg,
+    backgroundColor: C.bg,
   },
 
-  // === HEADER ===
+  // Header
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: CONTAINER_PADDING,
-    paddingVertical: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
     borderBottomWidth: 0.5,
-    borderBottomColor: VROOM_COLORS.border,
+    borderBottomColor: C.whiteFaint,
+  },
+  headerCenter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  accentBar: {
+    width: 3,
+    height: 16,
+    borderRadius: 1.5,
+    backgroundColor: C.accent,
   },
   headerTitle: {
-    fontSize: 16,
+    fontFamily: MONO,
+    fontSize: 13,
+    letterSpacing: 2,
+    color: C.white,
     fontWeight: '600',
-    color: VROOM_COLORS.dark,
+  },
+  headerCount: {
+    fontFamily: MONO,
+    fontSize: 12,
+    color: C.whiteSoft,
+    minWidth: 28,
+    textAlign: 'right',
   },
 
-  // === GRID ===
+  // Grid
   gridContent: {
-    paddingHorizontal: CONTAINER_PADDING,
-    paddingVertical: GAP,
+    paddingTop: GRID_GAP,
   },
-  columnWrapper: {
-    gap: GAP,
+  gridRow: {
+    gap: GRID_GAP,
   },
 
-  // === SAVED ITEM ===
-  savedItem: {
+  // Item
+  item: {
     width: ITEM_SIZE,
-    height: ITEM_SIZE,
-    borderRadius: 8,
-    overflow: 'hidden',
-    backgroundColor: VROOM_COLORS.fieldBg,
+    backgroundColor: C.surface,
   },
-  savedImage: {
-    width: '100%',
-    height: '100%',
+  itemImage: {
+    width: ITEM_SIZE,
+    height: ITEM_SIZE * 1.3,
   },
-  savedOverlay: {
+  itemOverlay: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(20, 1, 2, 0.4)',
+    flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'flex-start',
     padding: 8,
   },
-  savedInfo: {
-    flex: 1,
-    justifyContent: 'flex-end',
+  typeBadge: {
+    backgroundColor: 'rgba(20,1,2,0.75)',
+    borderRadius: 3,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderWidth: 0.5,
+    borderColor: 'rgba(255,255,255,0.2)',
   },
-  savedTitle: {
+  typeBadgeText: {
+    fontFamily: MONO,
+    fontSize: 7,
+    letterSpacing: 1,
+    color: C.white,
+    fontWeight: '600',
+  },
+  unsaveBtn: {
+    backgroundColor: 'rgba(20,1,2,0.75)',
+    borderRadius: 3,
+    padding: 5,
+  },
+  itemInfo: {
+    padding: 10,
+    paddingTop: 8,
+    gap: 2,
+  },
+  itemVehicle: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#FFFFFF',
-    marginBottom: 2,
+    color: C.white,
+    letterSpacing: 0.3,
   },
-  savedUser: {
+  itemUser: {
+    fontFamily: MONO,
     fontSize: 10,
-    color: 'rgba(255, 255, 255, 0.8)',
+    color: C.whiteSoft,
   },
-  likesBadge: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
+  likeRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: 'rgba(229, 9, 20, 0.9)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
+    marginTop: 4,
   },
-  likesCount: {
-    fontSize: 10,
+  likeCount: {
+    fontFamily: MONO,
+    fontSize: 9,
+    color: C.whiteSoft,
+  },
+
+  // Empty
+  empty: {
+    flex: 1,
+    alignItems: 'center',
+    paddingTop: 80,
+    paddingHorizontal: 40,
+    gap: 12,
+  },
+  emptyTitle: {
+    fontSize: 16,
     fontWeight: '600',
-    color: '#FFFFFF',
+    color: C.white,
+    textAlign: 'center',
+  },
+  emptySubtitle: {
+    fontFamily: MONO,
+    fontSize: 11,
+    color: C.whiteSoft,
+    textAlign: 'center',
+    lineHeight: 18,
   },
 });

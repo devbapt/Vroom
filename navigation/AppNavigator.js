@@ -4,9 +4,8 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { supabase } from '../supabaseClient';
 
-// Import de tes écrans
 import LoginScreen from '../screens/LoginScreen';
-import MainNavigator from './MainNavigator'; // Tes 5 onglets
+import MainNavigator from './MainNavigator'; 
 
 const Stack = createStackNavigator();
 
@@ -15,7 +14,6 @@ export default function AppNavigator() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // 1. Vérifie s'il y a déjà un utilisateur connecté au lancement (npm run web)
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setLoading(false);
