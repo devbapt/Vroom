@@ -1,352 +1,404 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   Pressable,
-  SafeAreaView,
-  ActivityIndicator,
-  Dimensions,
+  ScrollView,
   TextInput,
-  Modal,
+  Alert,
+  Dimensions,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image as ExpoImage } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
-import ImageService from '../services/ImageService';
+import * as ImagePicker from 'expo-image-picker';
+import { useNavigation } from '@react-navigation/native';
 import { useAppContext } from '../context';
 
-const { width, height } = Dimensions.get('window');
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const PREVIEW_HEIGHT = Math.min(SCREEN_HEIGHT * 0.55, (SCREEN_WIDTH - 32) * 16 / 9);
 
-// --- Colors ---
-const VROOM_COLORS = {
-  bg: '#FFFFFF',
-  dark: '#140102',
+const C = {
+  bg: '#140102',
+  surface: 'rgba(255,255,255,0.05)',
+  surfaceActive: 'rgba(229,9,20,0.12)',
   accent: '#E50914',
-  muted: '#8E8E93',
-  fieldBg: 'rgba(20, 1, 2, 0.05)',
-  border: '#EEEEEE',
+  white: '#FFFFFF',
+  whiteSoft: 'rgba(255,255,255,0.6)',
+  whiteFaint: 'rgba(255,255,255,0.2)',
+  placeholder: 'rgba(255,255,255,0.35)',
+  border: 'rgba(255,255,255,0.1)',
+  borderActive: 'rgba(229,9,20,0.6)',
 };
 
-const CONTAINER_PADDING = 16;
-const FALLBACK_IMAGE = require('../assets/logo_vroom_Couleur.png');
+const MONO = 'Courier';
 
-type CreateStoryScreenProps = {
-  visible: boolean;
-  onClose: () => void;
-  onStoryAdded: (image: string, name: string) => void;
-};
+export default function CreateStoryScreen() {
+  const insets = useSafeAreaInsets();
+  const navigation = useNavigation<any>();
+  const { user, addFeedStory, addHighlight, highlights } = useAppContext();
 
-export default function CreateStoryScreen({
-  visible,
-  onClose,
-  onStoryAdded,
-}: CreateStoryScreenProps) {
-  const [selectedImage, setSelectedImage] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [storyName, setStoryName] = useState('');
-  const { addHighlight } = useAppContext();
+  const [imageUri, setImageUri] = useState('');
+  const [caption, setCaption] = useState('');
+  const [addToHighlights, setAddToHighlights] = useState(false);
+  const [selectedHighlightId, setSelectedHighlightId] = useState<string>('');
 
-  const pickImage = async () => {
-    try {
-      setIsLoading(true);
-      const pickedImage = await ImageService.pickImage([9, 16], 0.8);
-      if (pickedImage) {
-        setSelectedImage(pickedImage);
-      }
-    } catch (error) {
-      console.error('Error picking image:', error);
-      alert('Failed to pick image');
-    } finally {
-      setIsLoading(false);
+  const pickImage = useCallback(async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission requise', 'Accès à la galerie nécessaire.');
+      return;
     }
-  };
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [9, 16],
+      quality: 0.85,
+    });
+    if (!result.canceled && result.assets[0]) {
+      setImageUri(result.assets[0].uri);
+    }
+  }, []);
 
-  const handlePublishStory = async () => {
-    if (!selectedImage || !storyName.trim()) {
-      alert('Please select an image and enter a name');
+  const handlePublish = useCallback(() => {
+    if (!imageUri) {
+      Alert.alert('Photo requise', 'Sélectionne une photo pour publier ta story.');
       return;
     }
 
-    setIsLoading(true);
-    try {
-      // Upload and compress image
-      const uploadResult = await ImageService.uploadImage(selectedImage, 'stories');
-      
-      if (uploadResult.success) {
-        // Add to global highlights
-        const newHighlight = {
-          id: String(Date.now()),
-          name: storyName,
-          image: uploadResult.url,
-          createdAt: Date.now(),
-          storyCount: 1,
-        };
-        
-        addHighlight(newHighlight);
-        
-        // Call parent callback for UI update
-        onStoryAdded(uploadResult.url, storyName);
-        
-        // Reset state
-        setSelectedImage(null);
-        setStoryName('');
-        setIsLoading(false);
-        onClose();
-      } else {
-        alert('Failed to upload story');
-        setIsLoading(false);
-      }
-    } catch (error) {
-      console.error('Error publishing story:', error);
-      alert('Failed to publish story');
-      setIsLoading(false);
-    }
-  };
+    addFeedStory({
+      userId: user?.id ?? 'user_123',
+      username: user?.username ?? 'moi',
+      avatar: user?.avatar ?? '',
+      imageUrl: imageUri,
+    });
 
-  if (!visible) return null;
+    if (addToHighlights) {
+      if (selectedHighlightId) {
+        // add to existing highlight (just increment count — Supabase will handle real data)
+      } else {
+        // create new highlight
+        addHighlight({
+          id: Date.now().toString(),
+          name: 'Story',
+          image: imageUri,
+          storyCount: 1,
+        });
+      }
+    }
+
+    navigation.goBack();
+  }, [imageUri, addFeedStory, addToHighlights, selectedHighlightId, addHighlight, user, navigation]);
 
   return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      transparent={false}
-      onRequestClose={onClose}
+    <KeyboardAvoidingView
+      style={styles.root}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <SafeAreaView style={styles.container}>
-      {/* === HEADER === */}
-      <View style={styles.header}>
-        <Pressable onPress={onClose} hitSlop={15}>
-          <Ionicons name="chevron-down" size={32} color={VROOM_COLORS.dark} />
+      {/* Header */}
+      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
+        <Pressable onPress={() => navigation.goBack()} hitSlop={12}>
+          <Ionicons name="arrow-back" size={24} color={C.white} />
         </Pressable>
-        <Text style={styles.headerTitle}>Create Story</Text>
+        <Text style={styles.headerTitle}>NOUVELLE STORY</Text>
         <Pressable
-          onPress={handlePublishStory}
-          disabled={isLoading || !selectedImage || !storyName.trim()}
           style={({ pressed }) => [
-            styles.shareBtn,
-            (pressed || isLoading || !selectedImage || !storyName.trim()) && {
-              opacity: 0.6,
-            },
+            styles.publishBtn,
+            !imageUri && styles.publishBtnDisabled,
+            pressed && { opacity: 0.8 },
           ]}
+          onPress={handlePublish}
+          disabled={!imageUri}
         >
-          {isLoading ? (
-            <ActivityIndicator size="small" color={VROOM_COLORS.accent} />
-          ) : (
-            <Text style={styles.shareBtnText}>Share</Text>
-          )}
+          <Text style={styles.publishBtnText}>PUBLIER</Text>
         </Pressable>
       </View>
 
-      {/* === CONTENT === */}
-      <View style={styles.content}>
-        {selectedImage ? (
-          <>
-            {/* Story Preview */}
-            <View style={styles.previewContainer}>
+      <ScrollView
+        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 32 }]}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Photo preview */}
+        <Pressable onPress={pickImage} style={styles.previewArea}>
+          {imageUri ? (
+            <>
               <ExpoImage
-                source={selectedImage}
-                style={styles.storyPreview}
+                source={imageUri}
+                style={styles.preview}
                 contentFit="cover"
               />
-              <Pressable
-                onPress={() => setSelectedImage(null)}
-                style={styles.changePhotoBtn}
-              >
-                <Text style={styles.changePhotoText}>Change Photo</Text>
-              </Pressable>
-            </View>
-
-            {/* Story Name Input */}
-            <View style={styles.inputSection}>
-              <Text style={styles.inputLabel}>Story Name</Text>
-              <View style={styles.nameInputWrapper}>
-                <TextInput
-                  style={styles.nameInput}
-                  value={storyName}
-                  onChangeText={setStoryName}
-                  placeholder="e.g., Track Day, Car Meet"
-                  placeholderTextColor={VROOM_COLORS.muted}
-                  maxLength={20}
-                />
-                <Text style={styles.charCounter}>
-                  {storyName.length}/20
-                </Text>
+              <View style={styles.replaceOverlay}>
+                <Ionicons name="camera-outline" size={18} color={C.white} />
+                <Text style={styles.replaceText}>Changer</Text>
               </View>
+            </>
+          ) : (
+            <View style={styles.previewPlaceholder}>
+              <Ionicons name="add-circle-outline" size={48} color={C.whiteFaint} />
+              <Text style={styles.previewPlaceholderTitle}>Sélectionner une photo</Text>
+              <Text style={styles.previewPlaceholderHint}>Format 9:16 · Visible 24h</Text>
             </View>
-          </>
-        ) : (
-          /* Initial State - Pick Image */
-          <View style={styles.emptyState}>
-            <View style={styles.iconContainer}>
-              <Ionicons name="images" size={64} color={VROOM_COLORS.accent} />
-            </View>
-            <Text style={styles.emptyTitle}>No Photo Selected</Text>
-            <Text style={styles.emptyHint}>
-              Pick a photo from your gallery to create a story
-            </Text>
-            <Pressable
-              onPress={pickImage}
-              disabled={isLoading}
-              style={({ pressed }) => [
-                styles.pickPhotoBtn,
-                pressed && { backgroundColor: 'rgba(229, 9, 20, 0.85)' },
-              ]}
-            >
-              {isLoading ? (
-                <ActivityIndicator size="small" color="#FFFFFF" />
-              ) : (
-                <>
-                  <Ionicons
-                    name="images-outline"
-                    size={20}
-                    color="#FFFFFF"
-                  />
-                  <Text style={styles.pickPhotoBtnText}>Pick Photo</Text>
-                </>
-              )}
-            </Pressable>
+          )}
+        </Pressable>
+
+        {/* Caption */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <View style={styles.accentBar} />
+            <Text style={styles.sectionTitle}>LÉGENDE (optionnel)</Text>
           </View>
-        )}
-      </View>
-      </SafeAreaView>
-    </Modal>
+          <TextInput
+            style={styles.captionInput}
+            value={caption}
+            onChangeText={(v) => v.length <= 100 && setCaption(v)}
+            placeholder="Ajoute une légende à ta story…"
+            placeholderTextColor={C.placeholder}
+            multiline
+            numberOfLines={3}
+            textAlignVertical="top"
+            selectionColor={C.accent}
+          />
+          <Text style={styles.charCount}>{caption.length}/100</Text>
+        </View>
+
+        {/* Highlights toggle */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <View style={styles.accentBar} />
+            <Text style={styles.sectionTitle}>AJOUTER AUX HIGHLIGHTS</Text>
+          </View>
+
+          <Pressable
+            style={styles.toggleRow}
+            onPress={() => setAddToHighlights(v => !v)}
+          >
+            <Text style={styles.toggleLabel}>Enregistrer dans mes Highlights</Text>
+            <View style={[styles.toggle, addToHighlights && styles.toggleOn]}>
+              <View style={[styles.toggleThumb, addToHighlights && styles.toggleThumbOn]} />
+            </View>
+          </Pressable>
+
+          {addToHighlights && (
+            <View style={styles.highlightList}>
+              <Text style={styles.highlightHint}>Choisir une catégorie :</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.highlightChips}>
+                {highlights.map(h => {
+                  const active = selectedHighlightId === h.id;
+                  return (
+                    <Pressable
+                      key={h.id}
+                      style={[styles.highlightChip, active && styles.highlightChipActive]}
+                      onPress={() => setSelectedHighlightId(active ? '' : h.id)}
+                    >
+                      <Text style={[styles.highlightChipText, active && styles.highlightChipTextActive]}>
+                        {h.name}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+                <Pressable
+                  style={[styles.highlightChip, selectedHighlightId === 'new' && styles.highlightChipActive]}
+                  onPress={() => setSelectedHighlightId('new')}
+                >
+                  <Ionicons name="add" size={12} color={selectedHighlightId === 'new' ? C.accent : C.whiteSoft} />
+                  <Text style={[styles.highlightChipText, selectedHighlightId === 'new' && styles.highlightChipTextActive]}>
+                    Nouveau
+                  </Text>
+                </Pressable>
+              </ScrollView>
+            </View>
+          )}
+        </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: VROOM_COLORS.bg,
-  },
+  root: { flex: 1, backgroundColor: C.bg },
 
-  // === HEADER ===
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: CONTAINER_PADDING,
-    paddingVertical: 12,
+    paddingHorizontal: 16,
+    paddingBottom: 12,
     borderBottomWidth: 0.5,
-    borderBottomColor: VROOM_COLORS.border,
+    borderBottomColor: C.border,
   },
   headerTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: VROOM_COLORS.dark,
+    fontFamily: MONO,
+    fontSize: 12,
+    letterSpacing: 2,
+    color: C.white,
+    fontWeight: '700',
   },
-  shareBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
-  shareBtnText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: VROOM_COLORS.accent,
-  },
-
-  // === CONTENT ===
-  content: {
-    flex: 1,
-    justifyContent: 'center',
-    paddingHorizontal: CONTAINER_PADDING,
-  },
-
-  // === PREVIEW STATE ===
-  previewContainer: {
-    marginBottom: 24,
-  },
-  storyPreview: {
-    width: '100%',
-    height: 400,
-    borderRadius: 12,
-    backgroundColor: VROOM_COLORS.fieldBg,
-    marginBottom: 16,
-  },
-  changePhotoBtn: {
-    alignSelf: 'center',
+  publishBtn: {
+    backgroundColor: C.accent,
+    borderRadius: 4,
     paddingHorizontal: 16,
-    paddingVertical: 10,
-    backgroundColor: VROOM_COLORS.fieldBg,
-    borderRadius: 8,
+    paddingVertical: 7,
   },
-  changePhotoText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: VROOM_COLORS.dark,
+  publishBtnDisabled: { opacity: 0.35 },
+  publishBtnText: {
+    fontFamily: MONO,
+    fontSize: 11,
+    letterSpacing: 1.5,
+    color: C.white,
+    fontWeight: '700',
   },
 
-  // === INPUT SECTION ===
-  inputSection: {
+  content: { paddingHorizontal: 16, paddingTop: 16 },
+
+  previewArea: {
+    width: '100%',
+    height: PREVIEW_HEIGHT,
+    borderRadius: 12,
+    overflow: 'hidden',
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderWidth: 1,
+    borderColor: C.border,
     marginBottom: 20,
   },
-  inputLabel: {
-    fontSize: 13,
+  preview: { width: '100%', height: '100%' },
+  replaceOverlay: {
+    position: 'absolute',
+    bottom: 12,
+    right: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  replaceText: {
+    fontSize: 12,
     fontWeight: '600',
-    color: VROOM_COLORS.dark,
-    marginBottom: 8,
+    color: C.white,
   },
-  nameInputWrapper: {
-    backgroundColor: VROOM_COLORS.fieldBg,
-    borderWidth: 1,
-    borderColor: VROOM_COLORS.border,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  nameInput: {
+  previewPlaceholder: {
     flex: 1,
-    fontSize: 14,
-    color: VROOM_COLORS.dark,
-  },
-  charCounter: {
-    fontSize: 11,
-    color: VROOM_COLORS.muted,
-    marginLeft: 8,
-  },
-
-  // === EMPTY STATE ===
-  emptyState: {
-    alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 40,
-  },
-  iconContainer: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: 'rgba(229, 9, 20, 0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  emptyTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: VROOM_COLORS.dark,
-    marginBottom: 8,
-  },
-  emptyHint: {
-    fontSize: 13,
-    color: VROOM_COLORS.muted,
-    textAlign: 'center',
-    marginBottom: 24,
-    lineHeight: 18,
-  },
-  pickPhotoBtn: {
-    flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    backgroundColor: VROOM_COLORS.accent,
-    paddingHorizontal: 24,
-    paddingVertical: 14,
-    borderRadius: 8,
   },
-  pickPhotoBtnText: {
-    fontSize: 14,
+  previewPlaceholderTitle: {
+    fontSize: 16,
     fontWeight: '600',
-    color: '#FFFFFF',
+    color: C.whiteSoft,
   },
+  previewPlaceholderHint: {
+    fontFamily: MONO,
+    fontSize: 9,
+    letterSpacing: 1,
+    color: C.whiteFaint,
+  },
+
+  section: { marginBottom: 24 },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12,
+  },
+  accentBar: {
+    width: 3, height: 14, borderRadius: 1.5,
+    backgroundColor: C.accent,
+  },
+  sectionTitle: {
+    fontFamily: MONO,
+    fontSize: 9,
+    letterSpacing: 2,
+    color: C.whiteSoft,
+    fontWeight: '600',
+  },
+
+  captionInput: {
+    backgroundColor: 'rgba(255,255,255,0.07)',
+    borderRadius: 8,
+    borderWidth: 0.5,
+    borderColor: C.border,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    color: C.white,
+    fontSize: 14,
+    minHeight: 80,
+  },
+  charCount: {
+    fontFamily: MONO,
+    fontSize: 9,
+    color: C.whiteFaint,
+    textAlign: 'right',
+    marginTop: 4,
+  },
+
+  // Toggle
+  toggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 4,
+  },
+  toggleLabel: {
+    fontSize: 14,
+    color: C.white,
+    fontWeight: '500',
+  },
+  toggle: {
+    width: 44,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    padding: 3,
+    justifyContent: 'center',
+  },
+  toggleOn: { backgroundColor: C.accent },
+  toggleThumb: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: C.white,
+    alignSelf: 'flex-start',
+  },
+  toggleThumbOn: { alignSelf: 'flex-end' },
+
+  // Highlights
+  highlightList: { marginTop: 14 },
+  highlightHint: {
+    fontFamily: MONO,
+    fontSize: 9,
+    letterSpacing: 1,
+    color: C.whiteFaint,
+    marginBottom: 8,
+  },
+  highlightChips: { gap: 8 },
+  highlightChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: C.border,
+    backgroundColor: C.surface,
+  },
+  highlightChipActive: {
+    borderColor: C.borderActive,
+    backgroundColor: C.surfaceActive,
+  },
+  highlightChipText: {
+    fontFamily: MONO,
+    fontSize: 10,
+    letterSpacing: 1,
+    color: C.whiteSoft,
+    fontWeight: '600',
+  },
+  highlightChipTextActive: { color: C.accent },
 });
