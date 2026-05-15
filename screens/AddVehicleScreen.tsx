@@ -1,365 +1,601 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   Pressable,
-  SafeAreaView,
   ScrollView,
   TextInput,
-  Image,
-  Dimensions,
+  Alert,
   KeyboardAvoidingView,
   Platform,
-  ActivityIndicator,
+  Dimensions,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image as ExpoImage } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import ImageService from '../services/ImageService';
+import * as ImagePicker from 'expo-image-picker';
+import { useNavigation } from '@react-navigation/native';
 import { useAppContext } from '../context';
+import type {
+  VehicleTransmission,
+  VehicleDrivetrain,
+  VehicleFuel,
+  VehicleStatus,
+} from '../context/AppContext';
 
-const { width } = Dimensions.get('window');
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-// --- Colors ---
-const VROOM_COLORS = {
-  bg: '#FFFFFF',
-  dark: '#140102',
+const C = {
+  bg: '#140102',
+  surface: '#1F0808',
   accent: '#E50914',
-  muted: '#8E8E93',
-  fieldBg: 'rgba(20, 1, 2, 0.05)',
-  border: '#EEEEEE',
+  white: '#FFFFFF',
+  whiteSoft: 'rgba(255,255,255,0.6)',
+  whiteFaint: 'rgba(255,255,255,0.2)',
+  placeholder: 'rgba(255,255,255,0.4)',
+  border: 'rgba(255,255,255,0.15)',
+  borderActive: 'rgba(229,9,20,0.6)',
 };
 
-const CONTAINER_PADDING = 16;
-const FALLBACK_IMAGE = require('../assets/logo_vroom_Couleur.png');
+const MONO = 'Courier';
 
-type AddVehicleScreenProps = {
-  navigation: any;
-};
+const BRANDS = [
+  'Alfa Romeo', 'Aston Martin', 'Audi', 'BMW', 'Bugatti', 'Chevrolet',
+  'Ferrari', 'Ford', 'Honda', 'Koenigsegg', 'Lamborghini', 'Maserati',
+  'McLaren', 'Mercedes-Benz', 'Nissan', 'Pagani', 'Porsche', 'Renault',
+  'Toyota', 'Volkswagen',
+];
 
-export default function AddVehicleScreen({ navigation }: AddVehicleScreenProps) {
-  const [brand, setBrand] = useState('');
-  const [model, setModel] = useState('');
-  const [imageUrl, setImageUrl] = useState('');
-  const [description, setDescription] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [isPickingImage, setIsPickingImage] = useState(false);
-  const insets = useSafeAreaInsets();
-  const { addPost } = useAppContext();
+// ─── Types ────────────────────────────────────────────────────────────────────
 
-  const pickImageFromGallery = async () => {
-    try {
-      setIsPickingImage(true);
-      const pickedImage = await ImageService.pickImage([4, 3], 0.8);
-      if (pickedImage) {
-        setImageUrl(pickedImage);
-      }
-    } catch (error) {
-      console.error('Error picking image:', error);
-      alert('Failed to pick image');
-    } finally {
-      setIsPickingImage(false);
-    }
-  };
+type ChipOption<T extends string> = { value: T; label: string };
 
-  const handlePublish = async () => {
-    if (!brand || !model) {
-      alert('Please fill in Brand and Model');
-      return;
-    }
-    if (!imageUrl) {
-      alert('Please select an image');
-      return;
-    }
-    setIsLoading(true);
-    try {
-      // Upload and compress image
-      const uploadResult = await ImageService.uploadImage(imageUrl, 'posts');
-      
-      if (uploadResult.success) {
-        // Add to global state
-        addPost({
-          id: String(Date.now()),
-          title: `${brand} ${model}`,
-          image: uploadResult.url,
-          description: description || undefined,
-          likes: 0,
-          comments: 0,
-          shares: 0,
-        });
-        
-        alert('Vehicle added successfully!');
-        navigation.goBack();
-      } else {
-        alert('Failed to upload image');
-      }
-    } catch (error) {
-      console.error('Publish error:', error);
-      alert('Failed to add vehicle');
-    } finally {
-      setIsLoading(false);
-    }
-  };
+const TRANSMISSION_OPTIONS: ChipOption<VehicleTransmission>[] = [
+  { value: 'MT',  label: 'MT' },
+  { value: 'AT',  label: 'AT' },
+  { value: 'DCT', label: 'DCT' },
+  { value: 'PDK', label: 'PDK' },
+  { value: 'CVT', label: 'CVT' },
+];
+
+const DRIVETRAIN_OPTIONS: ChipOption<VehicleDrivetrain>[] = [
+  { value: 'RWD', label: 'RWD' },
+  { value: 'FWD', label: 'FWD' },
+  { value: 'AWD', label: 'AWD' },
+  { value: '4WD', label: '4WD' },
+];
+
+const FUEL_OPTIONS: ChipOption<VehicleFuel>[] = [
+  { value: 'gasoline', label: 'Essence' },
+  { value: 'diesel',   label: 'Diesel' },
+  { value: 'hybrid',   label: 'Hybride' },
+  { value: 'electric', label: 'Électrique' },
+];
+
+const STATUS_OPTIONS: ChipOption<VehicleStatus>[] = [
+  { value: 'daily',   label: 'Daily' },
+  { value: 'weekend', label: 'Weekend' },
+  { value: 'track',   label: 'Track' },
+  { value: 'show',    label: 'Show' },
+  { value: 'project', label: 'Project' },
+];
+
+// ─── Sub-components ───────────────────────────────────────────────────────────
+
+function SectionTitle({ label }: { label: string }) {
+  return (
+    <View style={styles.sectionTitle}>
+      <View style={styles.accentBar} />
+      <Text style={styles.sectionTitleText}>{label}</Text>
+    </View>
+  );
+}
+
+function Field({
+  label,
+  value,
+  onChangeText,
+  placeholder,
+  multiline = false,
+  keyboardType = 'default',
+  mono = false,
+}: {
+  label: string;
+  value: string;
+  onChangeText: (v: string) => void;
+  placeholder: string;
+  multiline?: boolean;
+  keyboardType?: 'default' | 'numeric';
+  mono?: boolean;
+}) {
+  return (
+    <View style={styles.fieldWrapper}>
+      <Text style={styles.fieldLabel}>{label}</Text>
+      <TextInput
+        style={[
+          styles.fieldInput,
+          multiline && styles.fieldInputMultiline,
+          mono && { fontFamily: MONO, fontSize: 15 },
+        ]}
+        value={value}
+        onChangeText={onChangeText}
+        placeholder={placeholder}
+        placeholderTextColor={C.placeholder}
+        multiline={multiline}
+        numberOfLines={multiline ? 5 : 1}
+        keyboardType={keyboardType}
+        textAlignVertical={multiline ? 'top' : 'center'}
+        selectionColor={C.accent}
+      />
+    </View>
+  );
+}
+
+function ChipSelector<T extends string>({
+  label,
+  options,
+  value,
+  onChange,
+}: {
+  label: string;
+  options: ChipOption<T>[];
+  value: T | undefined;
+  onChange: (v: T) => void;
+}) {
+  return (
+    <View style={styles.fieldWrapper}>
+      <Text style={styles.fieldLabel}>{label}</Text>
+      <View style={styles.chipRow}>
+        {options.map(opt => {
+          const active = value === opt.value;
+          return (
+            <Pressable
+              key={opt.value}
+              style={[styles.chip, active && styles.chipActive]}
+              onPress={() => onChange(opt.value)}
+            >
+              <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                {opt.label}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
+function BrandInput({
+  value,
+  onChangeText,
+}: {
+  value: string;
+  onChangeText: (v: string) => void;
+}) {
+  const suggestions = value.length >= 2
+    ? BRANDS.filter(b => b.toLowerCase().startsWith(value.toLowerCase())).slice(0, 4)
+    : [];
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* === HEADER === */}
-      <View style={styles.header}>
-        <Pressable onPress={() => navigation.goBack()} hitSlop={15}>
-          <Ionicons name="chevron-down" size={32} color={VROOM_COLORS.dark} />
+    <View style={styles.fieldWrapper}>
+      <Text style={styles.fieldLabel}>MARQUE *</Text>
+      <TextInput
+        style={styles.fieldInput}
+        value={value}
+        onChangeText={onChangeText}
+        placeholder="Ferrari, Porsche…"
+        placeholderTextColor={C.placeholder}
+        selectionColor={C.accent}
+      />
+      {suggestions.length > 0 && (
+        <View style={styles.suggestions}>
+          {suggestions.map(s => (
+            <Pressable key={s} style={styles.suggestionItem} onPress={() => onChangeText(s)}>
+              <Text style={styles.suggestionText}>{s}</Text>
+            </Pressable>
+          ))}
+        </View>
+      )}
+    </View>
+  );
+}
+
+// ─── Main Screen ──────────────────────────────────────────────────────────────
+
+export default function AddVehicleScreen() {
+  const insets = useSafeAreaInsets();
+  const navigation = useNavigation<any>();
+  const { addVehicle } = useAppContext();
+
+  // Identity
+  const [imageUrl, setImageUrl] = useState('');
+  const [brand, setBrand] = useState('');
+  const [model, setModel] = useState('');
+  const [year, setYear] = useState('');
+  const [nickname, setNickname] = useState('');
+
+  // Technical
+  const [power, setPower] = useState('');
+  const [acceleration, setAcceleration] = useState('');
+  const [transmission, setTransmission] = useState<VehicleTransmission | undefined>();
+  const [drivetrain, setDrivetrain] = useState<VehicleDrivetrain | undefined>();
+  const [fuel, setFuel] = useState<VehicleFuel | undefined>();
+
+  // Details
+  const [color, setColor] = useState('');
+  const [mileage, setMileage] = useState('');
+  const [acquiredAt, setAcquiredAt] = useState('');
+  const [status, setStatus] = useState<VehicleStatus | undefined>();
+
+  // Notes
+  const [notes, setNotes] = useState('');
+
+  const isValid = imageUrl.trim() !== '' && brand.trim() !== '' && model.trim() !== '' && year.trim().length === 4;
+
+  const pickImage = useCallback(async () => {
+    const { status: perm } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (perm !== 'granted') {
+      Alert.alert('Permission requise', 'Accès à la galerie nécessaire.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [16, 9],
+      quality: 0.85,
+    });
+    if (!result.canceled && result.assets[0]) {
+      setImageUrl(result.assets[0].uri);
+    }
+  }, []);
+
+  const handleSubmit = useCallback(() => {
+    if (!isValid) return;
+    addVehicle({
+      imageUrl,
+      brand: brand.trim(),
+      model: model.trim(),
+      year: parseInt(year, 10),
+      nickname: nickname.trim() || undefined,
+      power: power.trim() || undefined,
+      acceleration: acceleration.trim() || undefined,
+      transmission,
+      drivetrain,
+      fuel,
+      color: color.trim() || undefined,
+      mileage: mileage ? parseInt(mileage, 10) : undefined,
+      acquiredAt: acquiredAt.trim() || undefined,
+      status,
+      notes: notes.trim() || undefined,
+    });
+    navigation.goBack();
+  }, [isValid, addVehicle, imageUrl, brand, model, year, nickname, power, acceleration, transmission, drivetrain, fuel, color, mileage, acquiredAt, status, notes, navigation]);
+
+  return (
+    <KeyboardAvoidingView
+      style={styles.root}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
+      {/* Header */}
+      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
+        <Pressable onPress={() => navigation.goBack()} hitSlop={12}>
+          <Ionicons name="arrow-back" size={24} color={C.white} />
         </Pressable>
-        <Text style={styles.headerTitle}>Add Vehicle</Text>
-        <Pressable
-          onPress={handlePublish}
-          disabled={isLoading || !brand || !model}
-          style={({ pressed }) => [
-            styles.publishBtn,
-            (pressed || isLoading || !brand || !model) && { opacity: 0.6 },
-          ]}
-        >
-          {isLoading ? (
-            <ActivityIndicator size="small" color={VROOM_COLORS.accent} />
-          ) : (
-            <Text style={styles.publishBtnText}>Publish</Text>
-          )}
-        </Pressable>
+        <Text style={styles.headerTitle}>AJOUTER AU GARAGE</Text>
+        <View style={{ width: 24 }} />
       </View>
 
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.flex}
+      <ScrollView
+        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 40 }]}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
       >
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.scrollContent}
-        >
-          {/* === IMAGE PICKER (Gallery) === */}
-          <View style={styles.fieldGroup}>
-            <Text style={styles.fieldLabel}>Cover Image *</Text>
-            <Pressable
-              onPress={pickImageFromGallery}
-              disabled={isPickingImage}
-              style={({ pressed }) => [
-                styles.imagePickerBtn,
-                pressed && { backgroundColor: 'rgba(229, 9, 20, 0.08)' },
-              ]}
-            >
-              {isPickingImage ? (
-                <ActivityIndicator size="small" color={VROOM_COLORS.accent} />
-              ) : (
-                <>
-                  <Ionicons name="images-outline" size={24} color={VROOM_COLORS.accent} />
-                  <Text style={styles.imagePickerText}>Select from Gallery</Text>
-                </>
-              )}
-            </Pressable>
-          </View>
+        {/* ── Photo ── */}
+        <SectionTitle label="PHOTO PRINCIPALE *" />
 
-          {/* === IMAGE PREVIEW SECTION === */}
-          {imageUrl && (
-            <View style={styles.imagePreviewSection}>
+        <Pressable style={styles.photoArea} onPress={pickImage}>
+          {imageUrl ? (
+            <>
               <ExpoImage
                 source={imageUrl}
-                style={styles.previewImage}
-                placeholder={FALLBACK_IMAGE}
+                style={styles.photoPreview}
                 contentFit="cover"
               />
-              <Pressable
-                onPress={() => setImageUrl('')}
-                style={styles.removeImageBtn}
-              >
-                <Ionicons name="close" size={20} color="#FFFFFF" />
-              </Pressable>
+              <View style={styles.replaceOverlay}>
+                <Ionicons name="camera-outline" size={20} color={C.white} />
+                <Text style={styles.replaceText}>Remplacer</Text>
+              </View>
+            </>
+          ) : (
+            <View style={styles.photoPlaceholder}>
+              <Ionicons name="camera-outline" size={36} color={C.whiteFaint} />
+              <Text style={styles.photoPlaceholderText}>Ajouter une photo</Text>
+              <Text style={styles.photoPlaceholderHint}>Format 16:9 recommandé</Text>
             </View>
           )}
+        </Pressable>
 
-          {/* === BRAND FIELD === */}
-          <View style={styles.fieldGroup}>
-            <Text style={styles.fieldLabel}>Brand *</Text>
-            <TextInput
-              style={styles.textInput}
-              value={brand}
-              onChangeText={setBrand}
-              placeholder="e.g., Ferrari, Porsche"
-              placeholderTextColor={VROOM_COLORS.muted}
-            />
+        {/* ── Identité ── */}
+        <SectionTitle label="IDENTITÉ" />
+
+        <BrandInput value={brand} onChangeText={setBrand} />
+
+        <View style={styles.row}>
+          <View style={{ flex: 3 }}>
+            <Field label="MODÈLE *" value={model} onChangeText={setModel} placeholder="911 GT3 RS" />
           </View>
-
-          {/* === MODEL FIELD === */}
-          <View style={styles.fieldGroup}>
-            <Text style={styles.fieldLabel}>Model *</Text>
-            <TextInput
-              style={styles.textInput}
-              value={model}
-              onChangeText={setModel}
-              placeholder="e.g., F8 Tributo, 911 GT3"
-              placeholderTextColor={VROOM_COLORS.muted}
-            />
+          <View style={{ flex: 1 }}>
+            <Field label="ANNÉE *" value={year} onChangeText={setYear} placeholder="2024" keyboardType="numeric" />
           </View>
+        </View>
 
-          {/* === DESCRIPTION FIELD === */}
-          <View style={styles.fieldGroup}>
-            <Text style={styles.fieldLabel}>Description</Text>
-            <TextInput
-              style={[styles.textInput, styles.descInput]}
-              value={description}
-              onChangeText={setDescription}
-              placeholder="Add details about your vehicle..."
-              placeholderTextColor={VROOM_COLORS.muted}
-              multiline
-              maxLength={200}
-            />
-            <Text style={styles.charCount}>{description.length}/200</Text>
+        <Field label="SURNOM (optionnel)" value={nickname} onChangeText={setNickname} placeholder="La rouge, Ma daily…" />
+
+        {/* ── Techniques ── */}
+        <SectionTitle label="CARACTÉRISTIQUES TECHNIQUES" />
+
+        <View style={styles.row}>
+          <View style={{ flex: 1 }}>
+            <Field label="POWER" value={power} onChangeText={setPower} placeholder="525hp" mono />
           </View>
+          <View style={{ flex: 1 }}>
+            <Field label="0–100 (s)" value={acceleration} onChangeText={setAcceleration} placeholder="3.2s" mono />
+          </View>
+        </View>
 
-          {/* === DIVIDER === */}
-          <View style={styles.divider} />
+        <ChipSelector label="TRANSMISSION" options={TRANSMISSION_OPTIONS} value={transmission} onChange={setTransmission} />
+        <ChipSelector label="TRANSMISSION DE PUISSANCE" options={DRIVETRAIN_OPTIONS} value={drivetrain} onChange={setDrivetrain} />
+        <ChipSelector label="CARBURANT" options={FUEL_OPTIONS} value={fuel} onChange={setFuel} />
 
-          {/* === INFO TEXT === */}
-          <Text style={styles.infoText}>
-            Your vehicle will be added to your garage and visible to your followers.
+        {/* ── Détails ── */}
+        <SectionTitle label="DÉTAILS OPTIONNELS" />
+
+        <View style={styles.row}>
+          <View style={{ flex: 1 }}>
+            <Field label="COULEUR" value={color} onChangeText={setColor} placeholder="Argent" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Field label="KILOMÉTRAGE" value={mileage} onChangeText={setMileage} placeholder="24 800" keyboardType="numeric" mono />
+          </View>
+        </View>
+
+        <Field label="DATE D'ACQUISITION" value={acquiredAt} onChangeText={setAcquiredAt} placeholder="MM/AAAA" />
+
+        <ChipSelector label="STATUT" options={STATUS_OPTIONS} value={status} onChange={setStatus} />
+
+        {/* ── Notes ── */}
+        <SectionTitle label="NOTES" />
+        <Field
+          label="HISTORIQUE / ANECDOTES"
+          value={notes}
+          onChangeText={(v) => v.length <= 500 && setNotes(v)}
+          placeholder="Restauration complète en 2023, acquis lors d'une enchère à Monaco…"
+          multiline
+        />
+        <Text style={styles.charCount}>{notes.length}/500</Text>
+
+        {/* ── CTA ── */}
+        <Pressable
+          style={[styles.submitBtn, !isValid && styles.submitBtnDisabled]}
+          onPress={handleSubmit}
+          disabled={!isValid}
+        >
+          <Ionicons name="car-sport-outline" size={18} color={C.white} />
+          <Text style={styles.submitBtnText}>AJOUTER AU GARAGE</Text>
+        </Pressable>
+
+        {!isValid && (
+          <Text style={styles.validationHint}>
+            Photo, marque, modèle et année requis
           </Text>
-
-          <View style={{ height: 20 }} />
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+        )}
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: VROOM_COLORS.bg,
-  },
-  flex: {
-    flex: 1,
-  },
+  root: { flex: 1, backgroundColor: C.bg },
 
-  // === HEADER ===
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: CONTAINER_PADDING,
-    paddingVertical: 12,
+    paddingHorizontal: 16,
+    paddingBottom: 12,
     borderBottomWidth: 0.5,
-    borderBottomColor: VROOM_COLORS.border,
+    borderBottomColor: C.border,
   },
   headerTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: VROOM_COLORS.dark,
-  },
-  publishBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
-  publishBtnText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: VROOM_COLORS.accent,
-  },
-
-  // === SCROLL ===
-  scrollContent: {
-    paddingHorizontal: CONTAINER_PADDING,
-    paddingVertical: 20,
-  },
-
-  // === IMAGE PREVIEW ===
-  imagePreviewSection: {
-    position: 'relative',
-    marginBottom: 20,
-  },
-  previewImage: {
-    width: '100%',
-    height: 240,
-    borderRadius: 12,
-    backgroundColor: VROOM_COLORS.fieldBg,
-  },
-  removeImageBtn: {
-    position: 'absolute',
-    top: 10,
-    right: 10,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-
-  // === IMAGE PICKER BUTTON ===
-  imagePickerBtn: {
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: VROOM_COLORS.fieldBg,
-    borderWidth: 1.5,
-    borderColor: VROOM_COLORS.accent,
-    borderRadius: 8,
-    paddingVertical: 32,
-    paddingHorizontal: 16,
-  },
-  imagePickerText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: VROOM_COLORS.accent,
-  },
-
-  // === FIELDS ===
-  fieldGroup: {
-    marginBottom: 20,
-  },
-  fieldLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: VROOM_COLORS.dark,
-    marginBottom: 8,
-    letterSpacing: 0.3,
-  },
-  fieldHint: {
-    fontSize: 11,
-    color: VROOM_COLORS.muted,
-    marginBottom: 6,
-    fontStyle: 'italic',
-  },
-  textInput: {
-    backgroundColor: VROOM_COLORS.fieldBg,
-    borderWidth: 1,
-    borderColor: VROOM_COLORS.border,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    fontSize: 14,
-    color: VROOM_COLORS.dark,
-  },
-  descInput: {
-    height: 100,
-    textAlignVertical: 'top',
-  },
-  charCount: {
-    fontSize: 11,
-    color: VROOM_COLORS.muted,
-    marginTop: 6,
-    textAlign: 'right',
-  },
-
-  // === DIVIDER ===
-  divider: {
-    height: 0.5,
-    backgroundColor: VROOM_COLORS.border,
-    marginVertical: 20,
-  },
-
-  // === INFO ===
-  infoText: {
+    fontFamily: MONO,
     fontSize: 12,
-    color: VROOM_COLORS.muted,
-    lineHeight: 18,
-    fontWeight: '400',
+    letterSpacing: 2,
+    color: C.white,
+    fontWeight: '700',
+  },
+
+  content: { paddingHorizontal: 16, paddingTop: 8 },
+
+  sectionTitle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 24,
+    marginBottom: 12,
+  },
+  accentBar: {
+    width: 3, height: 14, borderRadius: 1.5,
+    backgroundColor: C.accent,
+  },
+  sectionTitleText: {
+    fontFamily: MONO,
+    fontSize: 9,
+    letterSpacing: 2,
+    color: C.whiteSoft,
+    fontWeight: '600',
+  },
+
+  // Photo
+  photoArea: {
+    width: '100%',
+    height: (SCREEN_WIDTH - 32) * 9 / 16,
+    borderRadius: 10,
+    overflow: 'hidden',
+    backgroundColor: C.surface,
+    borderWidth: 1,
+    borderColor: C.border,
+  },
+  photoPreview: {
+    width: '100%',
+    height: '100%',
+  },
+  replaceOverlay: {
+    position: 'absolute',
+    bottom: 10,
+    right: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  replaceText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: C.white,
+  },
+  photoPlaceholder: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+  },
+  photoPlaceholderText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: C.whiteSoft,
+  },
+  photoPlaceholderHint: {
+    fontFamily: MONO,
+    fontSize: 9,
+    color: C.whiteFaint,
+    letterSpacing: 1,
+  },
+
+  row: { flexDirection: 'row', gap: 10 },
+
+  // Fields
+  fieldWrapper: { marginBottom: 10 },
+  fieldLabel: {
+    fontFamily: MONO,
+    fontSize: 8,
+    letterSpacing: 1.5,
+    color: C.whiteSoft,
+    marginBottom: 6,
+  },
+  fieldInput: {
+    backgroundColor: C.surface,
+    borderRadius: 8,
+    borderWidth: 0.5,
+    borderColor: C.border,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    color: C.white,
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  fieldInputMultiline: {
+    minHeight: 110,
+    paddingTop: 12,
+  },
+
+  // Suggestions
+  suggestions: {
+    marginTop: 4,
+    backgroundColor: C.surface,
+    borderRadius: 8,
+    borderWidth: 0.5,
+    borderColor: C.border,
+    overflow: 'hidden',
+  },
+  suggestionItem: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderBottomWidth: 0.5,
+    borderBottomColor: C.border,
+  },
+  suggestionText: {
+    fontSize: 13,
+    color: C.white,
+    fontWeight: '500',
+  },
+
+  // Chips
+  chipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  chip: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: C.border,
+    backgroundColor: C.surface,
+  },
+  chipActive: {
+    borderColor: C.borderActive,
+    backgroundColor: 'rgba(229,9,20,0.12)',
+  },
+  chipText: {
+    fontFamily: MONO,
+    fontSize: 10,
+    letterSpacing: 1,
+    color: C.whiteSoft,
+    fontWeight: '600',
+  },
+  chipTextActive: { color: C.accent },
+
+  charCount: {
+    fontFamily: MONO,
+    fontSize: 9,
+    color: C.whiteFaint,
+    textAlign: 'right',
+    marginTop: 4,
+    marginBottom: 8,
+  },
+
+  // Submit
+  submitBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    height: 50,
+    backgroundColor: C.accent,
+    borderRadius: 8,
+    marginTop: 28,
+  },
+  submitBtnDisabled: {
+    opacity: 0.4,
+  },
+  submitBtnText: {
+    fontFamily: MONO,
+    fontSize: 13,
+    letterSpacing: 2,
+    color: C.white,
+    fontWeight: '700',
+  },
+  validationHint: {
+    fontFamily: MONO,
+    fontSize: 9,
+    color: C.whiteFaint,
+    textAlign: 'center',
+    marginTop: 8,
+    letterSpacing: 0.5,
   },
 });

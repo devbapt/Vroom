@@ -17,7 +17,6 @@ import { Image as ExpoImage } from 'expo-image';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
-import * as ImagePicker from 'expo-image-picker';
 import { supabase } from '../supabaseClient';
 import { useAppContext } from '../context/AppContext';
 import { getTranslation } from '../i18n';
@@ -38,6 +37,15 @@ const PAD = 16;
 const PUB_GAP = 2;
 const PUB_SIZE = Math.floor((width - PUB_GAP * 2) / 3);
 const FALLBACK = require('../assets/logo_vroom_Couleur.png');
+
+const POST_TYPE_ICON: Record<string, string> = {
+  track:     'speedometer-outline',
+  road_trip: 'map-outline',
+  meet:      'people-outline',
+  daily:     'car-outline',
+  build:     'construct-outline',
+  spotted:   'eye-outline',
+};
 
 // Confirmed working Unsplash car photo IDs
 const CARS = {
@@ -139,7 +147,7 @@ const GARAGE_CARS: GarageCar[] = [
 export default function ProfileScreen() {
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
-  const { language, user, posts } = useAppContext();
+  const { language, user, cinePosts, vehicles } = useAppContext();
   const t = getTranslation(language);
 
   const [selectedCarId, setSelectedCarId] = useState<string | null>(null);
@@ -155,7 +163,27 @@ export default function ProfileScreen() {
     { id: '3', name: 'Meets',      image: CARS.cayman.replace('w=600&h=800', 'w=200&h=200') },
     { id: '4', name: 'Events',     image: CARS.lamborghini.replace('w=600&h=800', 'w=200&h=200') },
   ]);
-  const [garageItems, setGarageItems] = useState<GarageCar[]>(GARAGE_CARS);
+  // Merge static mock cars with dynamically added vehicles from context
+  const contextGarageCars: GarageCar[] = vehicles.map(v => ({
+    id: v.id,
+    name: `${v.brand} ${v.model}`,
+    year: String(v.year),
+    body: v.status ?? '—',
+    power: v.power ?? '—',
+    image: v.imageUrl,
+    images: [v.imageUrl],
+    specs: {
+      km: v.mileage ? v.mileage.toLocaleString() : '—',
+      motor: v.fuel ?? '—',
+      color: v.color ?? '—',
+      gearbox: v.transmission ?? '—',
+    },
+    history: v.notes ?? '',
+  }));
+  const garageItems: GarageCar[] = [...contextGarageCars, ...GARAGE_CARS];
+
+  // Publications from the Cine Drive feed filtered to current user
+  const myPublications = cinePosts.filter(p => p.user.id === (user?.id ?? 'user_123'));
 
   const selectedCar = garageItems.find((c) => c.id === selectedCarId) ?? null;
 
@@ -193,54 +221,20 @@ export default function ProfileScreen() {
     );
   };
 
-  const pickImage = async (aspect: [number, number] = [1, 1]) => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert(t.profile.permission_required, t.profile.permission_photos);
-      return null;
-    }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsEditing: true,
-      aspect,
-      quality: 0.85,
-    });
-    if (!result.canceled && result.assets[0]) return result.assets[0].uri;
-    return null;
+
+  const handleAddGarage = () => {
+    closeAddSheet();
+    navigation.navigate('AddVehicle');
   };
 
-  const handleAddGarage = async () => {
+  const handleAddPublication = () => {
     closeAddSheet();
-    const uri = await pickImage([3, 4]);
-    if (uri) {
-      const newCar: GarageCar = {
-        id: String(Date.now()),
-        name: 'Nouveau véhicule',
-        year: new Date().getFullYear().toString(),
-        body: 'Coupé',
-        power: '—',
-        image: uri,
-        images: [uri],
-        specs: { km: '—', motor: '—', color: '—', gearbox: '—' },
-        history: '',
-      };
-      setGarageItems((prev) => [...prev, newCar]);
-      setActiveTab('garage');
-    }
+    navigation.navigate('CreatePost');
   };
 
-  const handleAddPublication = async () => {
+  const handleAddStory = () => {
     closeAddSheet();
-    await pickImage([1, 1]);
-    setActiveTab('publications');
-  };
-
-  const handleAddStory = async () => {
-    closeAddSheet();
-    const uri = await pickImage([1, 1]);
-    if (uri) {
-      setHighlights((prev) => [...prev, { id: String(Date.now()), name: t.profile.new, image: uri }]);
-    }
+    navigation.navigate('CreateStory');
   };
 
   const handleLogout = async () => {
@@ -292,7 +286,7 @@ export default function ProfileScreen() {
           onDeleteHighlight={handleDeleteHighlight}
           language={language}
           user={user}
-          posts={posts}
+          posts={myPublications}
           profileTags={profileTags}
           garageItems={garageItems}
         />
@@ -570,12 +564,29 @@ function ProfileGridView({
         {/* ── Publications ── */}
         {activeTab === 'publications' && (
           <View style={styles.pubGrid}>
-            {posts.map((post) => (
-              <TouchableOpacity key={post.id} style={styles.pubItem} activeOpacity={0.9}>
-                <ExpoImage source={post.image} style={StyleSheet.absoluteFillObject}
-                  contentFit="cover" placeholder={FALLBACK} cachePolicy="memory-disk" />
-              </TouchableOpacity>
-            ))}
+            {posts.length === 0 ? (
+              <View style={styles.emptyTab}>
+                <Ionicons name="grid-outline" size={38} color={C.muted} />
+                <Text style={styles.emptyTabText}>Aucune publication</Text>
+              </View>
+            ) : (
+              posts.map((post: any) => (
+                <TouchableOpacity key={post.id} style={styles.pubItem} activeOpacity={0.9}>
+                  <ExpoImage
+                    source={post.photos?.[0] ?? post.image}
+                    style={StyleSheet.absoluteFillObject}
+                    contentFit="cover"
+                    placeholder={FALLBACK}
+                    cachePolicy="memory-disk"
+                  />
+                  {post.type && (
+                    <View style={styles.pubTypeBadge}>
+                      <Ionicons name={(POST_TYPE_ICON[post.type] ?? 'ellipse') as any} size={10} color="#FFF" />
+                    </View>
+                  )}
+                </TouchableOpacity>
+              ))
+            )}
           </View>
         )}
 
@@ -821,6 +832,12 @@ const styles = StyleSheet.create({
   pubItemMeta: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 4, backgroundColor: 'rgba(0,0,0,0.45)' },
   pubItemName: { fontSize: 9, fontWeight: '700', color: '#FFF' },
   pubItemYear: { fontSize: 8, color: 'rgba(255,255,255,0.8)' },
+  pubTypeBadge: {
+    position: 'absolute', top: 5, left: 5,
+    width: 20, height: 20, borderRadius: 10,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    justifyContent: 'center', alignItems: 'center',
+  },
 
   emptyTab: { alignItems: 'center', paddingVertical: 60, gap: 12 },
   emptyTabText: { color: C.muted, fontSize: 12 },

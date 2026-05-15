@@ -41,7 +41,89 @@ export interface LiveUser {
   lastActiveText?: string;
 }
 
-// ─── Mock Data ───────────────────────────────────────────────────────────────
+// ─── Feed Story Types ─────────────────────────────────────────────────────────
+
+export interface FeedStory {
+  id: string;
+  userId: string;
+  username: string;
+  avatar: string;
+  imageUrl: string;
+  createdAt: string;
+  viewedBy: string[];
+}
+
+// ─── Vehicle Types ────────────────────────────────────────────────────────────
+
+export type VehicleTransmission = 'MT' | 'AT' | 'DCT' | 'PDK' | 'CVT';
+export type VehicleDrivetrain   = 'RWD' | 'FWD' | 'AWD' | '4WD';
+export type VehicleFuel         = 'gasoline' | 'diesel' | 'hybrid' | 'electric';
+export type VehicleStatus       = 'daily' | 'weekend' | 'track' | 'show' | 'project';
+
+export interface Vehicle {
+  id: string;
+  userId: string;
+  imageUrl: string;
+  brand: string;
+  model: string;
+  year: number;
+  nickname?: string;
+  power?: string;
+  acceleration?: string;
+  transmission?: VehicleTransmission;
+  drivetrain?: VehicleDrivetrain;
+  fuel?: VehicleFuel;
+  color?: string;
+  mileage?: number;
+  acquiredAt?: string;
+  status?: VehicleStatus;
+  notes?: string;
+  createdAt: string;
+}
+
+// ─── Mock Data ────────────────────────────────────────────────────────────────
+
+const now = Date.now();
+const hrs = (h: number) => new Date(now - h * 3600 * 1000).toISOString();
+
+const MOCK_FEED_STORIES: FeedStory[] = [
+  {
+    id: 'fs0', userId: 'user_123', username: 'bapti_vroom',
+    avatar: 'https://i.pravatar.cc/150?img=12',
+    imageUrl: 'https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=500&h=900&fit=crop',
+    createdAt: hrs(4), viewedBy: [],
+  },
+  {
+    id: 'fs1', userId: 'u1', username: 'alex_gt3',
+    avatar: 'https://i.pravatar.cc/150?img=33',
+    imageUrl: 'https://images.unsplash.com/photo-1617814076367-b759c7d7e738?w=500&h=900&fit=crop',
+    createdAt: hrs(2), viewedBy: [],
+  },
+  {
+    id: 'fs2', userId: 'u2', username: 'maria.drives',
+    avatar: 'https://i.pravatar.cc/150?img=48',
+    imageUrl: 'https://images.unsplash.com/photo-1592198084033-aade902d1aae?w=500&h=900&fit=crop',
+    createdAt: hrs(3), viewedBy: [],
+  },
+  {
+    id: 'fs3', userId: 'u3', username: 'jdm_tokyo',
+    avatar: 'https://i.pravatar.cc/150?img=15',
+    imageUrl: 'https://images.unsplash.com/photo-1606664515524-ed2f786a0bd6?w=500&h=900&fit=crop',
+    createdAt: hrs(6), viewedBy: [],
+  },
+  {
+    id: 'fs4', userId: 'u5', username: 'baptiste_g',
+    avatar: 'https://i.pravatar.cc/150?img=60',
+    imageUrl: 'https://images.unsplash.com/photo-1544636331-e26879cd3d9a?w=500&h=900&fit=crop',
+    createdAt: hrs(10), viewedBy: ['user_123'],
+  },
+  {
+    id: 'fs5', userId: 'u6', username: 'swiss_spotter',
+    avatar: 'https://i.pravatar.cc/150?img=22',
+    imageUrl: 'https://images.unsplash.com/photo-1620882814836-98a2bc903323?w=500&h=900&fit=crop',
+    createdAt: hrs(14), viewedBy: ['user_123'],
+  },
+];
 
 const MOCK_CINE_POSTS: CineDrivePost[] = [
   {
@@ -93,7 +175,7 @@ const MOCK_CINE_POSTS: CineDrivePost[] = [
   },
   {
     id: 'p4', type: 'daily',
-    user: { id: 'u4', username: 'bapti_vroom', avatar: 'https://i.pravatar.cc/150?img=12' },
+    user: { id: 'user_123', username: 'bapti_vroom', avatar: 'https://i.pravatar.cc/150?img=12' },
     vehicle: { brand: 'PORSCHE', model: 'CAYMAN GTS', year: 2023 },
     location: 'Lyon',
     image: 'https://images.unsplash.com/photo-1542282088-fe8426682b8f?w=900&h=1600&fit=crop',
@@ -138,6 +220,8 @@ const MOCK_LIVE_USERS: LiveUser[] = [
   { id: 'l5', username: 'caferacer',    avatar: 'https://i.pravatar.cc/150?img=41', isLive: false, lastActiveText: '15m' },
   { id: 'l6', username: 'v8_nation',    avatar: 'https://i.pravatar.cc/150?img=68', isLive: false, lastActiveText: '32m' },
 ];
+
+// ─── Other types ──────────────────────────────────────────────────────────────
 
 export interface Highlight {
   id: string;
@@ -184,28 +268,25 @@ export interface UserProfile {
   tags?: ProfileTag[];
 }
 
+// ─── Context Type ─────────────────────────────────────────────────────────────
+
 export interface AppContextType {
-  // User
   user: UserProfile | null;
   updateProfile: (profile: Partial<UserProfile>) => void;
 
-  // Stories & Highlights
   highlights: Highlight[];
   addHighlight: (highlight: Highlight) => void;
   deleteHighlight: (id: string) => void;
 
-  // Posts
   posts: Post[];
   addPost: (post: Post) => void;
   likePost: (postId: string) => void;
   savePost: (postId: string) => void;
   deletePost: (postId: string) => void;
 
-  // Notifications & Feed
   unreadCount: number;
   markAsRead: () => void;
 
-  // Language
   language: Language;
   setLanguage: (lang: Language) => void;
 
@@ -216,9 +297,21 @@ export interface AppContextType {
   toggleLikeCinePost: (postId: string) => void;
   toggleSaveCinePost: (postId: string) => void;
   addCinePost: (post: CineDrivePost) => void;
+
+  // Feed Stories
+  feedStories: FeedStory[];
+  markStoryAsViewed: (storyId: string) => void;
+  addFeedStory: (story: Omit<FeedStory, 'id' | 'createdAt' | 'viewedBy'>) => void;
+
+  // Vehicles (garage)
+  vehicles: Vehicle[];
+  addVehicle: (v: Omit<Vehicle, 'id' | 'userId' | 'createdAt'>) => void;
+  removeVehicle: (id: string) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
+
+const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000;
 
 export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<UserProfile | null>({
@@ -257,6 +350,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   const [unreadCount, setUnreadCount] = useState(5);
   const [language, setLanguageState] = useState<Language>('fr');
+  const [cinePosts, setCinePosts] = useState<CineDrivePost[]>(MOCK_CINE_POSTS);
+  const [liveUsers] = useState<LiveUser[]>(MOCK_LIVE_USERS);
+  const [feedStories, setFeedStories] = useState<FeedStory[]>(MOCK_FEED_STORIES);
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
 
   const updateProfile = useCallback((profileUpdate: Partial<UserProfile>) => {
     setUser(prev => prev ? { ...prev, ...profileUpdate } : null);
@@ -275,31 +372,20 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const likePost = useCallback((postId: string) => {
-    setPosts(prev =>
-      prev.map(p => p.id === postId ? { ...p, likes: p.likes + 1 } : p)
-    );
+    setPosts(prev => prev.map(p => p.id === postId ? { ...p, likes: p.likes + 1 } : p));
   }, []);
 
   const savePost = useCallback((postId: string) => {
-    setPosts(prev =>
-      prev.map(p => p.id === postId ? { ...p, isSaved: !p.isSaved } : p)
-    );
+    setPosts(prev => prev.map(p => p.id === postId ? { ...p, isSaved: !p.isSaved } : p));
   }, []);
 
   const deletePost = useCallback((postId: string) => {
     setPosts(prev => prev.filter(p => p.id !== postId));
   }, []);
 
-  const markAsRead = useCallback(() => {
-    setUnreadCount(0);
-  }, []);
+  const markAsRead = useCallback(() => { setUnreadCount(0); }, []);
 
-  const changeLanguage = useCallback((lang: Language) => {
-    setLanguageState(lang);
-  }, []);
-
-  const [cinePosts, setCinePosts] = useState<CineDrivePost[]>(MOCK_CINE_POSTS);
-  const [liveUsers] = useState<LiveUser[]>(MOCK_LIVE_USERS);
+  const changeLanguage = useCallback((lang: Language) => { setLanguageState(lang); }, []);
 
   const toggleLikeCinePost = useCallback((postId: string) => {
     setCinePosts(prev =>
@@ -312,16 +398,53 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const toggleSaveCinePost = useCallback((postId: string) => {
-    setCinePosts(prev =>
-      prev.map(p => (p.id === postId ? { ...p, isSaved: !p.isSaved } : p))
-    );
+    setCinePosts(prev => prev.map(p => (p.id === postId ? { ...p, isSaved: !p.isSaved } : p)));
   }, []);
 
   const addCinePost = useCallback((post: CineDrivePost) => {
     setCinePosts(prev => [post, ...prev]);
   }, []);
 
+  // Feed Stories
+  const markStoryAsViewed = useCallback((storyId: string) => {
+    setFeedStories(prev =>
+      prev.map(s => {
+        if (s.id !== storyId) return s;
+        if (s.viewedBy.includes('user_123')) return s;
+        return { ...s, viewedBy: [...s.viewedBy, 'user_123'] };
+      })
+    );
+  }, []);
+
+  const addFeedStory = useCallback((story: Omit<FeedStory, 'id' | 'createdAt' | 'viewedBy'>) => {
+    const newStory: FeedStory = {
+      ...story,
+      id: Date.now().toString(),
+      createdAt: new Date().toISOString(),
+      viewedBy: [],
+    };
+    setFeedStories(prev => [newStory, ...prev]);
+  }, []);
+
+  // Vehicles
+  const addVehicle = useCallback((v: Omit<Vehicle, 'id' | 'userId' | 'createdAt'>) => {
+    const newVehicle: Vehicle = {
+      ...v,
+      id: Date.now().toString(),
+      userId: 'user_123',
+      createdAt: new Date().toISOString(),
+    };
+    setVehicles(prev => [newVehicle, ...prev]);
+  }, []);
+
+  const removeVehicle = useCallback((id: string) => {
+    setVehicles(prev => prev.filter(v => v.id !== id));
+  }, []);
+
   const savedCinePosts = cinePosts.filter(p => p.isSaved);
+  const activeStories = feedStories.filter(
+    s => Date.now() - new Date(s.createdAt).getTime() < TWENTY_FOUR_HOURS
+  );
 
   const value: AppContextType = {
     user,
@@ -344,6 +467,12 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     toggleLikeCinePost,
     toggleSaveCinePost,
     addCinePost,
+    feedStories: activeStories,
+    markStoryAsViewed,
+    addFeedStory,
+    vehicles,
+    addVehicle,
+    removeVehicle,
   };
 
   return (
@@ -355,9 +484,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
 export const useAppContext = (): AppContextType => {
   const context = useContext(AppContext);
-  if (!context) {
-    throw new Error('useAppContext must be used within AppProvider');
-  }
+  if (!context) throw new Error('useAppContext must be used within AppProvider');
   return context;
 };
 
