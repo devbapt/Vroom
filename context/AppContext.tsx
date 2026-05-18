@@ -1,5 +1,6 @@
-import { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react';
 import { Language } from '../i18n';
+import { supabase } from '../supabaseClient';
 
 // ─── Cine Drive Types ────────────────────────────────────────────────────────
 
@@ -81,146 +82,6 @@ export interface Vehicle {
   createdAt: string;
 }
 
-// ─── Mock Data ────────────────────────────────────────────────────────────────
-
-const now = Date.now();
-const hrs = (h: number) => new Date(now - h * 3600 * 1000).toISOString();
-
-const MOCK_FEED_STORIES: FeedStory[] = [
-  {
-    id: 'fs0', userId: 'user_123', username: 'bapti_vroom',
-    avatar: 'https://i.pravatar.cc/150?img=12',
-    imageUrl: 'https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=500&h=900&fit=crop',
-    createdAt: hrs(4), viewedBy: [],
-  },
-  {
-    id: 'fs1', userId: 'u1', username: 'alex_gt3',
-    avatar: 'https://i.pravatar.cc/150?img=33',
-    imageUrl: 'https://images.unsplash.com/photo-1617814076367-b759c7d7e738?w=500&h=900&fit=crop',
-    createdAt: hrs(2), viewedBy: [],
-  },
-  {
-    id: 'fs2', userId: 'u2', username: 'maria.drives',
-    avatar: 'https://i.pravatar.cc/150?img=48',
-    imageUrl: 'https://images.unsplash.com/photo-1592198084033-aade902d1aae?w=500&h=900&fit=crop',
-    createdAt: hrs(3), viewedBy: [],
-  },
-  {
-    id: 'fs3', userId: 'u3', username: 'jdm_tokyo',
-    avatar: 'https://i.pravatar.cc/150?img=15',
-    imageUrl: 'https://images.unsplash.com/photo-1606664515524-ed2f786a0bd6?w=500&h=900&fit=crop',
-    createdAt: hrs(6), viewedBy: [],
-  },
-  {
-    id: 'fs4', userId: 'u5', username: 'baptiste_g',
-    avatar: 'https://i.pravatar.cc/150?img=60',
-    imageUrl: 'https://images.unsplash.com/photo-1544636331-e26879cd3d9a?w=500&h=900&fit=crop',
-    createdAt: hrs(10), viewedBy: ['user_123'],
-  },
-  {
-    id: 'fs5', userId: 'u6', username: 'swiss_spotter',
-    avatar: 'https://i.pravatar.cc/150?img=22',
-    imageUrl: 'https://images.unsplash.com/photo-1620882814836-98a2bc903323?w=500&h=900&fit=crop',
-    createdAt: hrs(14), viewedBy: ['user_123'],
-  },
-];
-
-const MOCK_CINE_POSTS: CineDrivePost[] = [
-  {
-    id: 'p1', type: 'track',
-    user: { id: 'u1', username: 'alex_gt3', avatar: 'https://i.pravatar.cc/150?img=33' },
-    vehicle: { brand: 'PORSCHE', model: '911 GT3 RS', year: 2024 },
-    location: 'Paul Ricard',
-    image: 'https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=900&h=1600&fit=crop',
-    photos: [
-      'https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=900&h=1600&fit=crop',
-      'https://images.unsplash.com/photo-1619405399517-d7fce0f13302?w=900&h=1600&fit=crop',
-      'https://images.unsplash.com/photo-1617814076367-b759c7d7e738?w=900&h=1600&fit=crop',
-    ],
-    pages: [{ id: 'pg1', type: 'photo' }, { id: 'pg2', type: 'specs' }, { id: 'pg3', type: 'comments' }, { id: 'pg4', type: 'map' }],
-    hud: { kind: 'track', power: '525hp', acceleration: '3.2s', lapTime: '1:58.4' },
-    likes: 1247, isLiked: false, comments: 42, isSaved: false,
-    createdAt: '2024-04-12T14:32:00Z',
-  },
-  {
-    id: 'p2', type: 'road_trip',
-    user: { id: 'u2', username: 'maria.drives', avatar: 'https://i.pravatar.cc/150?img=48' },
-    vehicle: { brand: 'FERRARI', model: 'F8 TRIBUTO', year: 2022 },
-    location: 'Col de Turini',
-    image: 'https://images.unsplash.com/photo-1592198084033-aade902d1aae?w=900&h=1600&fit=crop',
-    photos: [
-      'https://images.unsplash.com/photo-1592198084033-aade902d1aae?w=900&h=1600&fit=crop',
-      'https://images.unsplash.com/photo-1471432338620-fc4a4607f2ce?w=900&h=1600&fit=crop',
-      'https://images.unsplash.com/photo-1449965408869-eaa3f722e40d?w=900&h=1600&fit=crop',
-    ],
-    pages: [{ id: 'pg1', type: 'photo' }, { id: 'pg2', type: 'map' }, { id: 'pg3', type: 'specs' }, { id: 'pg4', type: 'comments' }],
-    hud: { kind: 'road_trip', distance: '142km', duration: '3h12', crew: '4' },
-    likes: 3489, isLiked: true, comments: 128, isSaved: false,
-    createdAt: '2024-04-12T11:20:00Z',
-  },
-  {
-    id: 'p3', type: 'meet',
-    user: { id: 'u3', username: 'jdm_tokyo', avatar: 'https://i.pravatar.cc/150?img=15' },
-    vehicle: { brand: 'NISSAN', model: 'GT-R R34', year: 1999 },
-    location: 'Daikoku PA, Yokohama',
-    image: 'https://images.unsplash.com/photo-1606664515524-ed2f786a0bd6?w=900&h=1600&fit=crop',
-    photos: [
-      'https://images.unsplash.com/photo-1606664515524-ed2f786a0bd6?w=900&h=1600&fit=crop',
-      'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=900&h=1600&fit=crop',
-    ],
-    pages: [{ id: 'pg1', type: 'photo' }, { id: 'pg2', type: 'comments' }, { id: 'pg3', type: 'map' }],
-    hud: { kind: 'meet', city: 'YOKOHAMA', people: '120+', cars: '87' },
-    likes: 5621, isLiked: false, comments: 234, isSaved: true,
-    createdAt: '2024-04-11T22:00:00Z',
-  },
-  {
-    id: 'p4', type: 'daily',
-    user: { id: 'user_123', username: 'bapti_vroom', avatar: 'https://i.pravatar.cc/150?img=12' },
-    vehicle: { brand: 'PORSCHE', model: 'CAYMAN GTS', year: 2023 },
-    location: 'Lyon',
-    image: 'https://images.unsplash.com/photo-1542282088-fe8426682b8f?w=900&h=1600&fit=crop',
-    pages: [{ id: 'pg1', type: 'photo' }, { id: 'pg2', type: 'specs' }],
-    hud: { kind: 'daily', power: '365hp', acceleration: '4.6s', transmission: 'PDK' },
-    likes: 312, isLiked: false, comments: 18, isSaved: false,
-    createdAt: '2024-04-11T18:00:00Z',
-  },
-  {
-    id: 'p5', type: 'build',
-    user: { id: 'u5', username: 'baptiste_garage', avatar: 'https://i.pravatar.cc/150?img=60' },
-    vehicle: { brand: 'LAMBORGHINI', model: 'HURACÁN STO', year: 2022 },
-    location: 'Paris',
-    image: 'https://images.unsplash.com/photo-1544636331-e26879cd3d9a?w=900&h=1600&fit=crop',
-    photos: [
-      'https://images.unsplash.com/photo-1544636331-e26879cd3d9a?w=900&h=1600&fit=crop',
-      'https://images.unsplash.com/photo-1621135802920-133df287f89c?w=900&h=1600&fit=crop',
-    ],
-    pages: [{ id: 'pg1', type: 'photo' }, { id: 'pg2', type: 'specs' }, { id: 'pg3', type: 'comments' }, { id: 'pg4', type: 'map' }],
-    hud: { kind: 'build', mods: '12/15', budget: '€42k', phase: '3/5' },
-    likes: 4218, isLiked: true, comments: 189, isSaved: true,
-    createdAt: '2024-04-11T10:30:00Z',
-  },
-  {
-    id: 'p6', type: 'spotted',
-    user: { id: 'u6', username: 'swiss_spotter', avatar: 'https://i.pravatar.cc/150?img=22' },
-    vehicle: { brand: 'BUGATTI', model: 'CHIRON', year: 2023 },
-    location: 'Genève',
-    image: 'https://images.unsplash.com/photo-1620882814836-98a2bc903323?w=900&h=1600&fit=crop',
-    pages: [{ id: 'pg1', type: 'photo' }, { id: 'pg2', type: 'comments' }],
-    hud: { kind: 'spotted', city: 'GENÈVE', model: 'CHIRON', rarity: 5 },
-    likes: 8104, isLiked: false, comments: 412, isSaved: false,
-    createdAt: '2024-04-10T16:00:00Z',
-  },
-];
-
-const MOCK_LIVE_USERS: LiveUser[] = [
-  { id: 'l1', username: 'alex_gt3',     avatar: 'https://i.pravatar.cc/150?img=33', isLive: true },
-  { id: 'l2', username: 'maria.drives', avatar: 'https://i.pravatar.cc/150?img=48', isLive: true },
-  { id: 'l3', username: 'jdm_tokyo',    avatar: 'https://i.pravatar.cc/150?img=15', isLive: false, lastActiveText: '2m' },
-  { id: 'l4', username: 'baptiste_g',   avatar: 'https://i.pravatar.cc/150?img=60', isLive: false, lastActiveText: '8m' },
-  { id: 'l5', username: 'caferacer',    avatar: 'https://i.pravatar.cc/150?img=41', isLive: false, lastActiveText: '15m' },
-  { id: 'l6', username: 'v8_nation',    avatar: 'https://i.pravatar.cc/150?img=68', isLive: false, lastActiveText: '32m' },
-];
-
 // ─── Other types ──────────────────────────────────────────────────────────────
 
 export interface Highlight {
@@ -273,6 +134,7 @@ export interface UserProfile {
 export interface AppContextType {
   user: UserProfile | null;
   updateProfile: (profile: Partial<UserProfile>) => void;
+  refreshProfile: (userId: string) => Promise<void>;
 
   highlights: Highlight[];
   addHighlight: (highlight: Highlight) => void;
@@ -307,6 +169,11 @@ export interface AppContextType {
   vehicles: Vehicle[];
   addVehicle: (v: Omit<Vehicle, 'id' | 'userId' | 'createdAt'>) => void;
   removeVehicle: (id: string) => void;
+
+  // Welcome screen after signup
+  showWelcome: boolean;
+  triggerWelcome: () => void;
+  dismissWelcome: () => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -314,46 +181,19 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000;
 
 export const AppProvider = ({ children }: { children: ReactNode }) => {
-  const [user, setUser] = useState<UserProfile | null>({
-    id: 'user_123',
-    username: 'bapti_vroom',
-    displayName: 'Baptiste',
-    avatar: 'https://i.pravatar.cc/150?img=12',
-    bio: 'Passionné de GT & Vintage 🏁 Track day addict · Roadtrips sur route de montagne',
-    followersCount: 1200,
-    followingCount: 350,
-    postsCount: 6,
-    isPrivate: false,
-    tags: [
-      { id: 't1', label: 'Porsche', type: 'brand' as const },
-      { id: 't2', label: 'Ferrari', type: 'brand' as const },
-      { id: 't3', label: 'Circuit SPA', type: 'place' as const },
-      { id: 't4', label: 'Lyon FR', type: 'location' as const },
-    ],
-  });
-
-  const [highlights, setHighlights] = useState<Highlight[]>([
-    { id: '1', name: 'Car Shows', image: 'https://images.unsplash.com/photo-1540261014352-7a064dc8cc94?w=200&h=200&fit=crop', storyCount: 2 },
-    { id: '2', name: 'Track Days', image: 'https://images.unsplash.com/photo-1568605114967-8130f3a36994?w=200&h=200&fit=crop', storyCount: 1 },
-    { id: '3', name: 'Meets', image: 'https://images.unsplash.com/photo-1549399542-7e3f8b83ad5e?w=200&h=200&fit=crop', storyCount: 2 },
-    { id: '4', name: 'Events', image: 'https://images.unsplash.com/photo-1507950547674-7a86b984e2a1?w=200&h=200&fit=crop', storyCount: 1 },
-  ]);
-
-  const [posts, setPosts] = useState<Post[]>([
-    { id: '1', title: 'Ferrari F8', image: 'https://images.unsplash.com/photo-1592198084033-aade902d1aae?w=500&h=500&fit=crop', likes: 124, comments: 8, shares: 12 },
-    { id: '2', title: 'Porsche 911', image: 'https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=500&h=500&fit=crop', likes: 210, comments: 15, shares: 24 },
-    { id: '3', title: 'McLaren 720S', image: 'https://images.unsplash.com/photo-1620882814836-98a2bc903323?w=500&h=500&fit=crop', likes: 340, comments: 22, shares: 45 },
-    { id: '4', title: 'Lamborghini', image: 'https://images.unsplash.com/photo-1567818735868-e71b99932e29?w=500&h=500&fit=crop', likes: 520, comments: 35, shares: 78 },
-    { id: '5', title: 'Aston Martin', image: 'https://images.unsplash.com/photo-1609708536965-9e47b79e1ad7?w=500&h=500&fit=crop', likes: 189, comments: 11, shares: 18 },
-    { id: '6', title: 'Mercedes AMG', image: 'https://images.unsplash.com/photo-1542282088-fe8426682b8f?w=500&h=500&fit=crop', likes: 267, comments: 19, shares: 32 },
-  ]);
-
-  const [unreadCount, setUnreadCount] = useState(5);
+  const [user, setUser] = useState<UserProfile | null>(null);
+  const [highlights, setHighlights] = useState<Highlight[]>([]);
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
   const [language, setLanguageState] = useState<Language>('fr');
-  const [cinePosts, setCinePosts] = useState<CineDrivePost[]>(MOCK_CINE_POSTS);
-  const [liveUsers] = useState<LiveUser[]>(MOCK_LIVE_USERS);
-  const [feedStories, setFeedStories] = useState<FeedStory[]>(MOCK_FEED_STORIES);
+  const [cinePosts, setCinePosts] = useState<CineDrivePost[]>([]);
+  const [liveUsers] = useState<LiveUser[]>([]);
+  const [feedStories, setFeedStories] = useState<FeedStory[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [showWelcome, setShowWelcome] = useState(false);
+
+  const triggerWelcome = useCallback(() => setShowWelcome(true), []);
+  const dismissWelcome = useCallback(() => setShowWelcome(false), []);
 
   const updateProfile = useCallback((profileUpdate: Partial<UserProfile>) => {
     setUser(prev => prev ? { ...prev, ...profileUpdate } : null);
@@ -407,14 +247,15 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   // Feed Stories
   const markStoryAsViewed = useCallback((storyId: string) => {
+    const viewerId = user?.id ?? '';
     setFeedStories(prev =>
       prev.map(s => {
         if (s.id !== storyId) return s;
-        if (s.viewedBy.includes('user_123')) return s;
-        return { ...s, viewedBy: [...s.viewedBy, 'user_123'] };
+        if (s.viewedBy.includes(viewerId)) return s;
+        return { ...s, viewedBy: [...s.viewedBy, viewerId] };
       })
     );
-  }, []);
+  }, [user]);
 
   const addFeedStory = useCallback((story: Omit<FeedStory, 'id' | 'createdAt' | 'viewedBy'>) => {
     const newStory: FeedStory = {
@@ -431,14 +272,53 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const newVehicle: Vehicle = {
       ...v,
       id: Date.now().toString(),
-      userId: 'user_123',
+      userId: user?.id ?? '',
       createdAt: new Date().toISOString(),
     };
     setVehicles(prev => [newVehicle, ...prev]);
-  }, []);
+  }, [user]);
 
   const removeVehicle = useCallback((id: string) => {
     setVehicles(prev => prev.filter(v => v.id !== id));
+  }, []);
+
+  const fetchAndSetProfile = async (userId: string) => {
+    const { data } = await supabase
+      .from('profiles')
+      .select('id, username, full_name, avatar_url, bio')
+      .eq('id', userId)
+      .single();
+    setUser({
+      id: data?.id ?? userId,
+      username: data?.username ?? '',
+      displayName: data?.full_name ?? data?.username ?? '',
+      avatar: data?.avatar_url ?? '',
+      bio: data?.bio ?? '',
+      followersCount: 0,
+      followingCount: 0,
+      postsCount: 0,
+      isPrivate: false,
+      tags: [],
+    });
+  };
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) fetchAndSetProfile(session.user.id);
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        fetchAndSetProfile(session.user.id);
+      } else {
+        setUser(null);
+        setHighlights([]);
+        setPosts([]);
+        setCinePosts([]);
+        setFeedStories([]);
+        setVehicles([]);
+      }
+    });
+    return () => subscription.unsubscribe();
   }, []);
 
   const savedCinePosts = cinePosts.filter(p => p.isSaved);
@@ -449,6 +329,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const value: AppContextType = {
     user,
     updateProfile,
+    refreshProfile: fetchAndSetProfile,
     highlights,
     addHighlight,
     deleteHighlight,
@@ -473,6 +354,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     vehicles,
     addVehicle,
     removeVehicle,
+    showWelcome,
+    triggerWelcome,
+    dismissWelcome,
   };
 
   return (

@@ -3,13 +3,27 @@ import { View, ActivityIndicator } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { supabase } from '../supabaseClient';
+import { useAppContext } from '../context/AppContext';
 
 import LoginScreen from '../screens/LoginScreen';
-import MainNavigator from './MainNavigator'; 
+import SignupScreen from '../screens/SignupScreen';
+import WelcomeScreen from '../screens/WelcomeScreen';
+import MainNavigator from './MainNavigator';
 
 const Stack = createStackNavigator();
+const AuthStack = createStackNavigator();
+
+function AuthNavigator() {
+  return (
+    <AuthStack.Navigator screenOptions={{ headerShown: false }}>
+      <AuthStack.Screen name="Login" component={LoginScreen} />
+      <AuthStack.Screen name="Signup" component={SignupScreen} />
+    </AuthStack.Navigator>
+  );
+}
 
 export default function AppNavigator() {
+  const { showWelcome } = useAppContext();
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -40,11 +54,16 @@ export default function AppNavigator() {
     <NavigationContainer>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {session && session.user ? (
-          // UTILISATEUR CONNECTÉ ➡️ On affiche l'app avec les 5 onglets
-          <Stack.Screen name="MainApp" component={MainNavigator} />
+          showWelcome ? (
+            // NOUVEL INSCRIT ➡️ Écran de bienvenue 2.5s puis MainApp
+            <Stack.Screen name="Welcome" component={WelcomeScreen} />
+          ) : (
+            // UTILISATEUR CONNECTÉ ➡️ On affiche l'app avec les 5 onglets
+            <Stack.Screen name="MainApp" component={MainNavigator} />
+          )
         ) : (
           // NON CONNECTÉ ➡️ On affiche l'écran de connexion
-          <Stack.Screen name="Auth" component={LoginScreen} />
+          <Stack.Screen name="Auth" component={AuthNavigator} />
         )}
       </Stack.Navigator>
     </NavigationContainer>

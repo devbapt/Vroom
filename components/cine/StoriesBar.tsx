@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 import StoryViewer from '../../screens/StoryViewer';
 import { useAppContext } from '../../context';
 import type { FeedStory } from '../../context/AppContext';
@@ -67,22 +68,24 @@ const MyStoryItem = memo(function MyStoryItem({ avatar, hasActiveStory, onPress 
       <View style={styles.myStoryWrapper}>
         <View style={[
           styles.avatarRing,
-          hasActiveStory
-            ? { borderColor: C.ringUnseen }
-            : { borderColor: 'transparent', borderWidth: 0 },
+          { borderColor: hasActiveStory ? C.ringUnseen : 'rgba(255,255,255,0.3)' },
         ]}>
-          <ExpoImage
-            source={avatar}
-            style={styles.avatar}
-            contentFit="cover"
-            cachePolicy="memory-disk"
-          />
+          {avatar ? (
+            <ExpoImage
+              source={avatar}
+              style={styles.avatar}
+              contentFit="cover"
+              cachePolicy="memory-disk"
+            />
+          ) : (
+            <View style={styles.avatarPlaceholder}>
+              <Ionicons name="person-outline" size={28} color="rgba(255,255,255,0.45)" />
+            </View>
+          )}
         </View>
-        {!hasActiveStory && (
-          <View style={styles.addBadge}>
-            <Ionicons name="add" size={12} color={C.white} />
-          </View>
-        )}
+        <View style={styles.addBadge}>
+          <Ionicons name="add" size={12} color={C.white} />
+        </View>
       </View>
       <Text style={styles.storyLabel} numberOfLines={1}>
         Ma story
@@ -95,12 +98,13 @@ const MyStoryItem = memo(function MyStoryItem({ avatar, hasActiveStory, onPress 
 
 export default memo(function StoriesBar() {
   const { feedStories, markStoryAsViewed, user } = useAppContext();
+  const navigation = useNavigation<any>();
 
   const [viewerVisible, setViewerVisible]     = useState(false);
   const [viewerHighlightId, setViewerHighlightId] = useState('');
   const [viewerStories, setViewerStories]     = useState<{ id: string; image: string }[]>([]);
 
-  const currentUserId = user?.id ?? 'user_123';
+  const currentUserId = user?.id ?? '';
   const currentAvatar = user?.avatar ?? '';
 
   const myStory = feedStories.find(s => s.userId === currentUserId);
@@ -116,9 +120,10 @@ export default memo(function StoriesBar() {
   const openMyStory = useCallback(() => {
     if (myStory) {
       openStory(myStory);
+    } else {
+      navigation.navigate('Profile', { screen: 'EditProfile' });
     }
-    // If no story, navigate to CreateStory (handled by parent via onCreateStory prop if needed)
-  }, [myStory, openStory]);
+  }, [myStory, openStory, navigation]);
 
   return (
     <View style={styles.container}>
@@ -168,7 +173,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingVertical: 4,
     gap: 12,
     alignItems: 'center',
   },
@@ -193,6 +198,12 @@ const styles = StyleSheet.create({
     width: AVATAR_SIZE,
     height: AVATAR_SIZE,
     borderRadius: AVATAR_SIZE / 2,
+  },
+  avatarPlaceholder: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.06)',
   },
   addBadge: {
     position: 'absolute',

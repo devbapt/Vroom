@@ -74,7 +74,6 @@ function CustomTabBar({ state, navigation }: BottomTabBarProps) {
           >
             <View style={styles.iconWrapper}>
               <Ionicons name={iconName} size={22} color={iconColor} />
-              {isFocused && <View style={styles.dot} />}
             </View>
             <Text style={[styles.label, { color: iconColor }]}>{label}</Text>
           </Pressable>
@@ -101,13 +100,6 @@ const styles = StyleSheet.create({
   },
   iconWrapper: {
     alignItems: 'center',
-  },
-  dot: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: ACCENT,
-    marginTop: 3,
   },
   label: {
     fontSize: 10,
