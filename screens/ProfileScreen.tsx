@@ -47,18 +47,6 @@ const POST_TYPE_ICON: Record<string, string> = {
   spotted:   'eye-outline',
 };
 
-// Confirmed working Unsplash car photo IDs
-const CARS = {
-  porsche911: 'https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=600&h=800&fit=crop',
-  ferrari:    'https://images.unsplash.com/photo-1592198084033-aade902d1aae?w=600&h=800&fit=crop',
-  cayman:     'https://images.unsplash.com/photo-1544636331-e26879cd3d9a?w=600&h=800&fit=crop',
-  lamborghini:'https://images.unsplash.com/photo-1494976388531-d1058494cdd8?w=600&h=800&fit=crop',
-  aston:      'https://images.unsplash.com/photo-1609708536965-9e47b79e1ad7?w=600&h=800&fit=crop',
-  mercedes:   'https://images.unsplash.com/photo-1542282088-fe8426682b8f?w=600&h=800&fit=crop',
-  ferrari2:   'https://images.unsplash.com/photo-1553882900-d174edf69a16?w=600&h=800&fit=crop',
-  porsche2:   'https://images.unsplash.com/photo-1552820728-8ac41f1ce891?w=600&h=800&fit=crop',
-  lamborghini2:'https://images.unsplash.com/photo-1567818735868-e71b99932e29?w=600&h=800&fit=crop',
-};
 
 interface GarageCar {
   id: string;
@@ -71,75 +59,6 @@ interface GarageCar {
   specs: { km: string; motor: string; color: string; gearbox: string };
   history: string;
 }
-
-const GARAGE_CARS: GarageCar[] = [
-  {
-    id: '1',
-    name: 'Porsche 911 Carrera RS',
-    year: '1973',
-    body: 'Coupé',
-    power: '210 ch',
-    image: CARS.porsche911,
-    images: [CARS.porsche911, CARS.porsche2, CARS.cayman],
-    specs: { km: '12 400', motor: '6 cyl.', color: 'Argent', gearbox: 'Manuelle' },
-    history: "Acquise en 2018 lors d'une vente aux enchères à Monaco. Full matching numbers. Dernier service Porsche Classic Lyon, avril 2024.",
-  },
-  {
-    id: '2',
-    name: 'Ferrari 250 GTE',
-    year: '1962',
-    body: 'Berlinette',
-    power: '280 ch',
-    image: CARS.ferrari,
-    images: [CARS.ferrari, CARS.ferrari2, CARS.aston],
-    specs: { km: '48 200', motor: 'V12', color: 'Rosso', gearbox: 'Manuelle' },
-    history: "Châssis numéro deux correspondants. Restauration complète en 2020 par un spécialiste Ferrari.",
-  },
-  {
-    id: '3',
-    name: 'Porsche Cayman GT4',
-    year: '2018',
-    body: 'Coupé',
-    power: '420 ch',
-    image: CARS.cayman,
-    images: [CARS.cayman, CARS.porsche911, CARS.porsche2],
-    specs: { km: '24 800', motor: '6 cyl.', color: 'Blanc', gearbox: 'Manuelle' },
-    history: 'Cayman GT4 première génération, état concours. Suivi complet Porsche Centre Lyon.',
-  },
-  {
-    id: '4',
-    name: 'Lamborghini Countach LP400',
-    year: '1974',
-    body: 'Coupé',
-    power: '375 ch',
-    image: CARS.lamborghini,
-    images: [CARS.lamborghini, CARS.lamborghini2],
-    specs: { km: '31 500', motor: 'V12', color: 'Giallo', gearbox: 'Manuelle' },
-    history: "Countach LP400 originale. Restauration intégrale avec pièces d'origine Lamborghini.",
-  },
-  {
-    id: '5',
-    name: 'Aston Martin DB5',
-    year: '1964',
-    body: 'Coupé GT',
-    power: '282 ch',
-    image: CARS.aston,
-    images: [CARS.aston, CARS.mercedes],
-    specs: { km: '66 100', motor: '6 cyl.', color: 'Silver Birch', gearbox: 'Manuelle' },
-    history: "DB5 série originale récupérée d'une collection privée en Angleterre en 2019.",
-  },
-  {
-    id: '6',
-    name: 'Mercedes 300 SL Gullwing',
-    year: '1955',
-    body: 'Coupé',
-    power: '240 ch',
-    image: CARS.mercedes,
-    images: [CARS.mercedes, CARS.aston],
-    specs: { km: '44 200', motor: '6 cyl.', color: 'Argent', gearbox: 'Manuelle' },
-    history: "300 SL Gullwing numéros correspondants. Restauration réalisée par un atelier Mercedes Classic agréé.",
-  },
-];
 
 // =====================================================================
 // Root Screen
@@ -157,12 +76,7 @@ export default function ProfileScreen() {
   const [slideAnim] = useState(new Animated.Value(600));
   const [addSlideAnim] = useState(new Animated.Value(600));
   const [refreshing, setRefreshing] = useState(false);
-  const [highlights, setHighlights] = useState([
-    { id: '1', name: 'Car Shows',  image: CARS.porsche911.replace('w=600&h=800', 'w=200&h=200') },
-    { id: '2', name: 'Track Days', image: CARS.ferrari.replace('w=600&h=800', 'w=200&h=200') },
-    { id: '3', name: 'Meets',      image: CARS.cayman.replace('w=600&h=800', 'w=200&h=200') },
-    { id: '4', name: 'Events',     image: CARS.lamborghini.replace('w=600&h=800', 'w=200&h=200') },
-  ]);
+  const [highlights, setHighlights] = useState<{ id: string; name: string; image: string }[]>([]);
   // Merge static mock cars with dynamically added vehicles from context
   const contextGarageCars: GarageCar[] = vehicles.map(v => ({
     id: v.id,
@@ -180,19 +94,13 @@ export default function ProfileScreen() {
     },
     history: v.notes ?? '',
   }));
-  const garageItems: GarageCar[] = [...contextGarageCars, ...GARAGE_CARS];
+  const garageItems: GarageCar[] = [...contextGarageCars];
 
-  // Publications from the Cine Drive feed filtered to current user
-  const myPublications = cinePosts.filter(p => p.user.id === (user?.id ?? 'user_123'));
+  const myPublications = cinePosts.filter(p => p.user.id === user?.id);
 
   const selectedCar = garageItems.find((c) => c.id === selectedCarId) ?? null;
 
-  const profileTags: ProfileTag[] = user?.tags ?? [
-    { id: 't1', label: 'Porsche', type: 'brand' },
-    { id: 't2', label: 'Ferrari', type: 'brand' },
-    { id: 't3', label: 'Circuit SPA', type: 'place' },
-    { id: 't4', label: 'Lyon FR', type: 'location' },
-  ];
+  const profileTags: ProfileTag[] = user?.tags ?? [];
 
   const onRefresh = React.useCallback(() => {
     setRefreshing(true);
@@ -245,7 +153,7 @@ export default function ProfileScreen() {
   const handleShareProfile = async () => {
     try {
       await Share.share({
-        message: `Découvre le profil de ${user?.displayName ?? 'Alex Driver'} (@${user?.username ?? 'Alex_Driver_23'}) sur Vroom 🏎️`,
+        message: `Découvre le profil de ${user?.displayName ?? user?.username ?? ''} (@${user?.username ?? ''}) sur Vroom 🏎️`,
       });
     } catch (_) {}
   };
@@ -404,11 +312,11 @@ function ProfileGridView({
   garageItems: GarageCar[];
 }) {
   const t = getTranslation(language);
-  const username = user?.username ?? 'Alex_Driver_23';
-  const displayName = user?.displayName ?? 'Alex Driver';
-  const bio = user?.bio ?? 'Passionné de GT & Vintage 🏁 Track day addict · Roadtrips sur route de montagne';
-  const avatarUri = user?.avatar ?? null;
-  const followersCount = user?.followersCount ?? 1200;
+  const username = user?.username ?? '';
+  const displayName = user?.displayName ?? username;
+  const bio = user?.bio ?? '';
+  const avatarUri = user?.avatar || null;
+  const followersCount = user?.followersCount ?? 0;
 
   const formatCount = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n));
 
@@ -440,7 +348,7 @@ function ProfileGridView({
                     placeholder={FALLBACK} cachePolicy="memory-disk" />
                 ) : (
                   <View style={styles.avatarInner}>
-                    <Text style={styles.avatarInitials}>AD</Text>
+                    <Ionicons name="person-circle-outline" size={64} color={C.muted} />
                   </View>
                 )}
               </View>
@@ -453,9 +361,9 @@ function ProfileGridView({
 
           {/* Stats — ordre: Événements | Abonnés | Groupes */}
           <View style={styles.statsRow}>
-            <StatColumn value="18" label={t.profile.events} />
+            <StatColumn value="0" label={t.profile.events} />
             <StatColumn value={formatCount(followersCount)} label={t.profile.followers} />
-            <StatColumn value="5" label={t.profile.groups} />
+            <StatColumn value="0" label={t.profile.groups} />
           </View>
         </View>
 
@@ -489,9 +397,9 @@ function ProfileGridView({
         {/* ── Activity cards ── */}
         <View style={styles.activityRow}>
           {[
-            { value: '12', label: t.profile.events_participations, bg: C.accent },
+            { value: '0', label: t.profile.events_participations, bg: C.accent },
             { value: String(garageItems.length), label: t.profile.cars_garage, bg: C.dark },
-            { value: '47', label: t.profile.trackdays, bg: C.dark },
+            { value: '0', label: t.profile.trackdays, bg: C.dark },
           ].map((card, i) => (
             <View key={i} style={[styles.activityCard, { backgroundColor: card.bg }]}>
               <Text style={styles.activityValue}>{card.value}</Text>
@@ -546,18 +454,22 @@ function ProfileGridView({
         {/* ── Garage — grille 3 colonnes identique aux publications ── */}
         {activeTab === 'garage' && (
           <View style={styles.pubGrid}>
-            {garageItems.map((car) => (
-              <TouchableOpacity key={car.id} style={styles.pubItem}
-                onPress={() => onCarPress(car.id)} activeOpacity={0.9}>
-                <ExpoImage source={car.image} style={StyleSheet.absoluteFillObject}
-                  contentFit="cover" placeholder={FALLBACK} cachePolicy="memory-disk" />
-                <View style={styles.pubItemGradient} />
-                <View style={styles.pubItemMeta}>
-                  <Text style={styles.pubItemName} numberOfLines={1}>{car.name}</Text>
-                  <Text style={styles.pubItemYear}>{car.year}</Text>
-                </View>
-              </TouchableOpacity>
-            ))}
+            {garageItems.length === 0 ? (
+              <View style={styles.emptyTab} />
+            ) : (
+              garageItems.map((car) => (
+                <TouchableOpacity key={car.id} style={styles.pubItem}
+                  onPress={() => onCarPress(car.id)} activeOpacity={0.9}>
+                  <ExpoImage source={car.image} style={StyleSheet.absoluteFillObject}
+                    contentFit="cover" placeholder={FALLBACK} cachePolicy="memory-disk" />
+                  <View style={styles.pubItemGradient} />
+                  <View style={styles.pubItemMeta}>
+                    <Text style={styles.pubItemName} numberOfLines={1}>{car.name}</Text>
+                    <Text style={styles.pubItemYear}>{car.year}</Text>
+                  </View>
+                </TouchableOpacity>
+              ))
+            )}
           </View>
         )}
 
@@ -565,10 +477,7 @@ function ProfileGridView({
         {activeTab === 'publications' && (
           <View style={styles.pubGrid}>
             {posts.length === 0 ? (
-              <View style={styles.emptyTab}>
-                <Ionicons name="grid-outline" size={38} color={C.muted} />
-                <Text style={styles.emptyTabText}>Aucune publication</Text>
-              </View>
+              <View style={styles.emptyTab} />
             ) : (
               posts.map((post: any) => (
                 <TouchableOpacity key={post.id} style={styles.pubItem} activeOpacity={0.9}>

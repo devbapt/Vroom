@@ -14,6 +14,7 @@ import {
 import { Image as ExpoImage } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import { supabase } from '../supabaseClient';
 import { useAppContext } from '../context/AppContext';
 import type { ProfileTag } from '../context/AppContext';
 import { getTranslation } from '../i18n';
@@ -35,21 +36,14 @@ export default function EditProfileScreen({ navigation }: EditProfileScreenProps
   const { language, user, updateProfile } = useAppContext();
   const t = getTranslation(language);
 
-  const [name, setName] = useState(user?.displayName ?? 'Alex Driver');
-  const [username, setUsername] = useState(user?.username ?? 'Alex_Driver_23');
+  const [name, setName] = useState(user?.displayName ?? '');
+  const [username, setUsername] = useState(user?.username ?? '');
   const [bio, setBio] = useState(user?.bio ?? '');
-  const [avatarUri, setAvatarUri] = useState(user?.avatar ?? 'https://i.pravatar.cc/150?img=12');
+  const [avatarUri, setAvatarUri] = useState(user?.avatar ?? '');
   const [isPickingImage, setIsPickingImage] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  const [tags, setTags] = useState<ProfileTag[]>(
-    user?.tags ?? [
-      { id: 't1', label: 'Porsche', type: 'brand' },
-      { id: 't2', label: 'Ferrari', type: 'brand' },
-      { id: 't3', label: 'Circuit SPA', type: 'place' },
-      { id: 't4', label: 'Lyon FR', type: 'location' },
-    ]
-  );
+  const [tags, setTags] = useState<ProfileTag[]>(user?.tags ?? []);
   const [newTagInput, setNewTagInput] = useState('');
   const [newTagType, setNewTagType] = useState<'brand' | 'place' | 'location'>('brand');
 
@@ -73,12 +67,59 @@ export default function EditProfileScreen({ navigation }: EditProfileScreenProps
   };
 
   const handleSave = async () => {
+    if (!user?.id) return;
     setIsSaving(true);
-    updateProfile({ displayName: name, username, bio, avatar: avatarUri, tags });
-    setTimeout(() => {
-      setIsSaving(false);
+    try {
+      let finalAvatarUrl = user?.avatar ?? '';
+
+      // Si l'URI est locale (photo fraîchement choisie), uploader dans Supabase Storage
+      const isLocalUri = avatarUri && !avatarUri.startsWith('http');
+      if (isLocalUri) {
+        const ext = (avatarUri.split('.').pop()?.split('?')[0]?.toLowerCase()) ?? 'jpg';
+        const mime = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
+        const filePath = `${user.id}/avatar.${ext}`;
+
+        const response = await fetch(avatarUri);
+        const blob = await response.blob();
+
+        const { error: uploadError } = await supabase.storage
+          .from('avatars')
+          .upload(filePath, blob, { upsert: true, contentType: mime });
+
+        if (!uploadError) {
+          const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(filePath);
+          finalAvatarUrl = urlData.publicUrl;
+        }
+      } else if (avatarUri.startsWith('http')) {
+        finalAvatarUrl = avatarUri;
+      }
+
+      // Persister tous les champs en Supabase
+      await supabase
+        .from('profiles')
+        .update({
+          full_name: name.trim(),
+          username: username.trim().toLowerCase(),
+          bio: bio.trim(),
+          avatar_url: finalAvatarUrl || null,
+        })
+        .eq('id', user.id);
+
+      // Mettre à jour le contexte en mémoire
+      updateProfile({
+        displayName: name.trim(),
+        username: username.trim().toLowerCase(),
+        bio: bio.trim(),
+        avatar: finalAvatarUrl,
+        tags,
+      });
+
       navigation.goBack();
-    }, 600);
+    } catch (error) {
+      console.error('Save profile error:', error);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const addTag = () => {
@@ -112,12 +153,17 @@ export default function EditProfileScreen({ navigation }: EditProfileScreenProps
 
           {/* Avatar */}
           <View style={styles.avatarSection}>
-            <ExpoImage
-              source={avatarUri}
-              style={styles.avatarImage}
-              placeholder="https://i.pravatar.cc/150"
-              contentFit="cover"
-            />
+            {avatarUri ? (
+              <ExpoImage
+                source={avatarUri}
+                style={styles.avatarImage}
+                contentFit="cover"
+              />
+            ) : (
+              <View style={[styles.avatarImage, styles.avatarPlaceholder]}>
+                <Ionicons name="person-circle-outline" size={70} color={VROOM_COLORS.muted} />
+              </View>
+            )}
             <Pressable
               onPress={changeAvatar}
               disabled={isPickingImage}
@@ -285,6 +331,7 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: VROOM_COLORS.accent,
   },
+  avatarPlaceholder: { justifyContent: 'center', alignItems: 'center' },
   changeAvatarBtn: {
     flexDirection: 'row',
     alignItems: 'center',

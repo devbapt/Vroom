@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import {
   View,
   Text,
@@ -10,7 +10,7 @@ import {
   Pressable,
   ActivityIndicator,
   Alert,
-  type PressableStateCallbackType
+
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../supabaseClient'; 
@@ -19,7 +19,6 @@ import IconVroom from '../assets/icon_vroom_Couleur.svg';
 import TypoVroom from '../assets/typo_vroom_Blanc.svg';
 import GoogleLogo from '../assets/google_logo.svg';
 
-type PressableState = PressableStateCallbackType & { hovered?: boolean };
 
 const COLORS = {
   bg: '#140102',
@@ -32,7 +31,7 @@ const COLORS = {
   separator: 'rgba(255, 250, 250, 0.16)',
 };
 
-export default function LoginScreen() {
+export default function LoginScreen({ navigation }: { navigation: any }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -67,9 +66,9 @@ export default function LoginScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <KeyboardAvoidingView 
+      <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.container}
+        style={[styles.container, { backgroundColor: COLORS.bg }]}
       >
         <View style={styles.headerContainer}>
           <View style={styles.logoRow}>
@@ -88,7 +87,7 @@ export default function LoginScreen() {
               style={styles.icon}
             />
             <TextInput
-              style={[styles.input, Platform.OS === 'web' && { outlineStyle: 'none' } as any]}
+              style={[styles.input, { color: COLORS.text }, Platform.OS === 'web' && { outlineStyle: 'none' } as any]}
               placeholder="Email"
               placeholderTextColor={COLORS.textMuted}
               keyboardType="email-address"
@@ -109,7 +108,7 @@ export default function LoginScreen() {
               style={styles.icon}
             />
             <TextInput
-              style={[styles.input, Platform.OS === 'web' && { outlineStyle: 'none' } as any]}
+              style={[styles.input, { color: COLORS.text }, Platform.OS === 'web' && { outlineStyle: 'none' } as any]}
               placeholder="Mot de passe"
               placeholderTextColor={COLORS.textMuted}
               secureTextEntry={!showPassword}
@@ -177,7 +176,10 @@ export default function LoginScreen() {
 
         <View style={styles.footer}>
           <Text style={styles.footerText}>Tu n'as pas de compte ? </Text>
-          <Pressable style={({ hovered }: any) => [hovered && { opacity: 0.7 }]}>
+          <Pressable
+            onPress={() => navigation.navigate('Signup')}
+            style={({ hovered }: any) => [hovered && { opacity: 0.7 }]}
+          >
             <Text style={styles.signupText}>Inscrivez-vous</Text>
           </Pressable>
         </View>
