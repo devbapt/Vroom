@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -12,7 +12,9 @@ import {
   Share,
   RefreshControl,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
 import { Image as ExpoImage } from 'expo-image';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -66,12 +68,15 @@ interface GarageCar {
 export default function ProfileScreen() {
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
-  const { language, user, cinePosts, vehicles } = useAppContext();
+  const { language, user, cinePosts, vehicles, updateProfileAvatar } = useAppContext();
   const t = getTranslation(language);
 
   const [selectedCarId, setSelectedCarId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'garage' | 'publications' | 'itineraires'>('garage');
   const [menuVisible, setMenuVisible] = useState(false);
+  const [pendingAvatarUri, setPendingAvatarUri] = useState<string | null>(null);
+  const [pendingAvatarBase64, setPendingAvatarBase64] = useState<string | null>(null);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [addSheetVisible, setAddSheetVisible] = useState(false);
   const [slideAnim] = useState(new Animated.Value(600));
   const [addSlideAnim] = useState(new Animated.Value(600));
@@ -145,6 +150,98 @@ export default function ProfileScreen() {
     navigation.navigate('CreateStory');
   };
 
+  const pickAvatar = useCallback(async () => {
+    console.log('[Avatar:pick] start');
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    console.log('[Avatar:pick] permission =', status);
+    if (status !== 'granted') {
+      Alert.alert('Permission refusée', 'Autorisez l\'accès à la galerie dans les réglages.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.85,
+      base64: true,
+    });
+    console.log('[Avatar:pick] canceled =', result.canceled);
+    if (!result.canceled && result.assets[0]) {
+      const asset = result.assets[0];
+      console.log('[Avatar:pick] uri prefix =', asset.uri?.substring(0, 60));
+      console.log('[Avatar:pick] base64 field available =', !!asset.base64, 'length =', asset.base64?.length ?? 0);
+
+      let b64: string | null = asset.base64 ?? null;
+
+      // Web: uri is a data URI like "data:image/png;base64,iVBOR..." when base64 field is absent
+      if (!b64 && asset.uri?.startsWith('data:')) {
+        console.log('[Avatar:pick] extracting base64 from data URI');
+        const comma = asset.uri.indexOf(',');
+        b64 = comma >= 0 ? asset.uri.substring(comma + 1) : null;
+      }
+      // Strip prefix if the base64 field itself contains it (some environments)
+      if (b64 && b64.includes(';base64,')) {
+        console.log('[Avatar:pick] stripping data URI prefix from base64 field');
+        b64 = b64.split(';base64,')[1] ?? b64;
+      }
+
+      console.log('[Avatar:pick] final b64 length =', b64?.length ?? 0);
+      setPendingAvatarUri(asset.uri);
+      setPendingAvatarBase64(b64);
+    }
+  }, []);
+
+  const confirmAvatar = useCallback(async () => {
+    console.log('[Avatar:confirm] start — pendingAvatarBase64 length =', pendingAvatarBase64?.length ?? 0, '| user.id =', user?.id);
+    if (!pendingAvatarBase64 || !user?.id) {
+      console.warn('[Avatar:confirm] EARLY RETURN — missing base64 or user.id');
+      return;
+    }
+    setIsUploadingAvatar(true);
+    try {
+      const filePath = `${user.id}/avatar.jpg`;
+      console.log('[Avatar:confirm] filePath =', filePath);
+
+      console.log('[Avatar:confirm] converting base64 → Uint8Array...');
+      const binaryStr = atob(pendingAvatarBase64);
+      const bytes = new Uint8Array(binaryStr.length);
+      for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);
+      console.log('[Avatar:confirm] bytes.length =', bytes.length);
+
+      console.log('[Avatar:confirm] uploading to Supabase Storage bucket=avatars...');
+      const { error: uploadError, data: uploadData } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, bytes, { upsert: true, contentType: 'image/jpeg' });
+      console.log('[Avatar:confirm] upload result — error:', uploadError, '| data:', uploadData);
+
+      if (uploadError) {
+        console.error('[Avatar:confirm] UPLOAD FAILED:', uploadError.message);
+        throw uploadError;
+      }
+
+      const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(filePath);
+      const finalUrl = `${urlData.publicUrl}?v=${Date.now()}`;
+      console.log('[Avatar:confirm] public URL =', finalUrl);
+
+      console.log('[Avatar:confirm] calling updateProfileAvatar...');
+      await updateProfileAvatar(finalUrl);
+      console.log('[Avatar:confirm] updateProfileAvatar done — clearing pending state');
+
+      setPendingAvatarUri(null);
+      setPendingAvatarBase64(null);
+    } catch (e) {
+      console.error('[Avatar:confirm] EXCEPTION:', e);
+      Alert.alert('Erreur', 'Impossible de mettre à jour la photo.');
+    } finally {
+      setIsUploadingAvatar(false);
+    }
+  }, [pendingAvatarBase64, user?.id, updateProfileAvatar]);
+
+  const cancelAvatar = useCallback(() => {
+    setPendingAvatarUri(null);
+    setPendingAvatarBase64(null);
+  }, []);
+
   const handleLogout = async () => {
     closeMenu();
     await supabase.auth.signOut();
@@ -197,6 +294,11 @@ export default function ProfileScreen() {
           posts={myPublications}
           profileTags={profileTags}
           garageItems={garageItems}
+          pendingAvatarUri={pendingAvatarUri}
+          isUploadingAvatar={isUploadingAvatar}
+          onPickAvatar={pickAvatar}
+          onConfirmAvatar={confirmAvatar}
+          onCancelAvatar={cancelAvatar}
         />
       )}
 
@@ -292,6 +394,11 @@ function ProfileGridView({
   posts,
   profileTags,
   garageItems,
+  pendingAvatarUri,
+  isUploadingAvatar,
+  onPickAvatar,
+  onConfirmAvatar,
+  onCancelAvatar,
 }: {
   insets: ReturnType<typeof useSafeAreaInsets>;
   activeTab: string;
@@ -310,6 +417,11 @@ function ProfileGridView({
   posts: any[];
   profileTags: ProfileTag[];
   garageItems: GarageCar[];
+  pendingAvatarUri: string | null;
+  isUploadingAvatar: boolean;
+  onPickAvatar: () => void;
+  onConfirmAvatar: () => void;
+  onCancelAvatar: () => void;
 }) {
   const t = getTranslation(language);
   const username = user?.username ?? '';
@@ -337,11 +449,41 @@ function ProfileGridView({
           </TouchableOpacity>
         </View>
 
+        {/* ── Pending avatar preview (full-width, inline) ── */}
+        {pendingAvatarUri && (
+          <View style={styles.avatarPreviewSection}>
+            <ExpoImage
+              source={pendingAvatarUri}
+              style={styles.avatarPreviewImage}
+              contentFit="cover"
+            />
+            <View style={styles.avatarPreviewButtons}>
+              <TouchableOpacity
+                style={styles.avatarCancelBtn}
+                onPress={onCancelAvatar}
+                disabled={isUploadingAvatar}
+              >
+                <Text style={styles.avatarCancelText}>Annuler</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.avatarConfirmBtn}
+                onPress={onConfirmAvatar}
+                disabled={isUploadingAvatar}
+              >
+                {isUploadingAvatar
+                  ? <ActivityIndicator size="small" color="#FFF" />
+                  : <Text style={styles.avatarConfirmText}>Confirmer</Text>
+                }
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
         {/* ── Profile row ── */}
         <View style={styles.profileRow}>
-          {/* Avatar — tap = edit profile */}
+          {/* Avatar — tap = changer la photo */}
           <View style={styles.avatarContainer}>
-            <TouchableOpacity onPress={() => onNavigate('EditProfile')}>
+            <TouchableOpacity onPress={onPickAvatar}>
               <View style={styles.avatarRing}>
                 {avatarUri ? (
                   <ExpoImage source={avatarUri} style={styles.avatarImage} contentFit="cover"
@@ -825,4 +967,53 @@ const styles = StyleSheet.create({
   sheetItemHint: { fontSize: 11, color: C.muted, marginTop: 1 },
   sheetIcon: { width: 36, height: 36, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
   sheetDivider: { height: StyleSheet.hairlineWidth, backgroundColor: C.border, marginVertical: 4 },
+
+  avatarPreviewSection: {
+    alignItems: 'center',
+    paddingHorizontal: PAD,
+    paddingVertical: 16,
+    backgroundColor: '#F8F8F8',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: C.border,
+  },
+  avatarPreviewImage: {
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+    borderWidth: 3,
+    borderColor: C.accent,
+    marginBottom: 16,
+  },
+  avatarPreviewButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    width: '100%',
+  },
+  avatarCancelBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: C.border,
+    alignItems: 'center',
+  },
+  avatarCancelText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: C.dark,
+  },
+  avatarConfirmBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 8,
+    backgroundColor: C.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 44,
+  },
+  avatarConfirmText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
   });
