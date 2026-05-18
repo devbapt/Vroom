@@ -19,17 +19,20 @@ interface Props {
 function HomeHeader({ onAddPress }: Props) {
   return (
     <View style={styles.container}>
+      <View style={styles.side} />
       <View style={styles.logoRow}>
         <IconVroom width={30} height={30} />
         <TypoVroom width={76} height={22} style={styles.typo} />
       </View>
-      <Pressable
-        style={({ pressed }) => [styles.addButton, pressed && { opacity: 0.7 }]}
-        onPress={onAddPress}
-        hitSlop={10}
-      >
-        <Ionicons name="add" size={20} color={C.white} />
-      </Pressable>
+      <View style={styles.side}>
+        <Pressable
+          style={({ pressed }) => [styles.addButton, pressed && { opacity: 0.7 }]}
+          onPress={onAddPress}
+          hitSlop={10}
+        >
+          <Ionicons name="add" size={20} color={C.white} />
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -41,9 +44,12 @@ const styles = StyleSheet.create({
     height: HEADER_HEIGHT,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     paddingHorizontal: 16,
     backgroundColor: C.bg,
+  },
+  side: {
+    flex: 1,
+    alignItems: 'flex-end',
   },
   logoRow: {
     flexDirection: 'row',

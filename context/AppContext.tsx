@@ -134,6 +134,7 @@ export interface UserProfile {
 export interface AppContextType {
   user: UserProfile | null;
   updateProfile: (profile: Partial<UserProfile>) => void;
+  updateProfileAvatar: (avatarUrl: string) => Promise<void>;
   refreshProfile: (userId: string) => Promise<void>;
 
   highlights: Highlight[];
@@ -198,6 +199,22 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const updateProfile = useCallback((profileUpdate: Partial<UserProfile>) => {
     setUser(prev => prev ? { ...prev, ...profileUpdate } : null);
   }, []);
+
+  const updateProfileAvatar = useCallback(async (avatarUrl: string) => {
+    console.log('[AppContext:updateProfileAvatar] called — url =', avatarUrl);
+    if (!user?.id) {
+      console.warn('[AppContext:updateProfileAvatar] EARLY RETURN — no user.id');
+      return;
+    }
+    console.log('[AppContext:updateProfileAvatar] writing avatar_url to DB for user', user.id);
+    const { error: dbError } = await supabase.from('profiles').update({ avatar_url: avatarUrl }).eq('id', user.id);
+    console.log('[AppContext:updateProfileAvatar] DB update result — error:', dbError ?? 'none');
+    setUser(prev => {
+      console.log('[AppContext:updateProfileAvatar] setUser — prev.avatar =', prev?.avatar, '→ new =', avatarUrl);
+      return prev ? { ...prev, avatar: avatarUrl } : null;
+    });
+    console.log('[AppContext:updateProfileAvatar] done');
+  }, [user?.id]);
 
   const addHighlight = useCallback((highlight: Highlight) => {
     setHighlights(prev => [...prev, highlight]);
@@ -329,6 +346,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const value: AppContextType = {
     user,
     updateProfile,
+    updateProfileAvatar,
     refreshProfile: fetchAndSetProfile,
     highlights,
     addHighlight,

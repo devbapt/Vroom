@@ -33,13 +33,14 @@ const CONTAINER_PADDING = 16;
 type EditProfileScreenProps = { navigation: any };
 
 export default function EditProfileScreen({ navigation }: EditProfileScreenProps) {
-  const { language, user, updateProfile } = useAppContext();
+  const { language, user, updateProfile, updateProfileAvatar } = useAppContext();
   const t = getTranslation(language);
 
   const [name, setName] = useState(user?.displayName ?? '');
   const [username, setUsername] = useState(user?.username ?? '');
   const [bio, setBio] = useState(user?.bio ?? '');
   const [avatarUri, setAvatarUri] = useState(user?.avatar ?? '');
+  const [avatarBase64, setAvatarBase64] = useState<string | null>(null);
   const [isPickingImage, setIsPickingImage] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -55,9 +56,22 @@ export default function EditProfileScreen({ navigation }: EditProfileScreenProps
         allowsEditing: true,
         aspect: [1, 1],
         quality: 0.9,
+        base64: true,
       });
       if (!result.canceled && result.assets[0]) {
-        setAvatarUri(result.assets[0].uri);
+        const asset = result.assets[0];
+        setAvatarUri(asset.uri);
+
+        let b64 = asset.base64 ?? null;
+        // Web: uri is a data URI when base64 field is absent
+        if (!b64 && asset.uri?.startsWith('data:')) {
+          const comma = asset.uri.indexOf(',');
+          b64 = comma >= 0 ? asset.uri.substring(comma + 1) : null;
+        }
+        if (b64?.includes(';base64,')) {
+          b64 = b64.split(';base64,')[1] ?? b64;
+        }
+        setAvatarBase64(b64);
       }
     } catch (error) {
       console.error('Image picker error:', error);
@@ -72,29 +86,27 @@ export default function EditProfileScreen({ navigation }: EditProfileScreenProps
     try {
       let finalAvatarUrl = user?.avatar ?? '';
 
-      // Si l'URI est locale (photo fraîchement choisie), uploader dans Supabase Storage
-      const isLocalUri = avatarUri && !avatarUri.startsWith('http');
-      if (isLocalUri) {
-        const ext = (avatarUri.split('.').pop()?.split('?')[0]?.toLowerCase()) ?? 'jpg';
-        const mime = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg';
-        const filePath = `${user.id}/avatar.${ext}`;
-
-        const response = await fetch(avatarUri);
-        const blob = await response.blob();
+      const isNewAvatar = avatarBase64 !== null;
+      if (isNewAvatar) {
+        const filePath = `${user.id}/avatar.jpg`;
+        const binaryStr = atob(avatarBase64!);
+        const bytes = new Uint8Array(binaryStr.length);
+        for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);
 
         const { error: uploadError } = await supabase.storage
           .from('avatars')
-          .upload(filePath, blob, { upsert: true, contentType: mime });
+          .upload(filePath, bytes, { upsert: true, contentType: 'image/jpeg' });
 
         if (!uploadError) {
           const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(filePath);
-          finalAvatarUrl = urlData.publicUrl;
+          finalAvatarUrl = `${urlData.publicUrl}?v=${Date.now()}`;
+        } else {
+          console.error('EditProfile avatar upload error:', uploadError.message);
         }
       } else if (avatarUri.startsWith('http')) {
         finalAvatarUrl = avatarUri;
       }
 
-      // Persister tous les champs en Supabase
       await supabase
         .from('profiles')
         .update({
@@ -105,7 +117,6 @@ export default function EditProfileScreen({ navigation }: EditProfileScreenProps
         })
         .eq('id', user.id);
 
-      // Mettre à jour le contexte en mémoire
       updateProfile({
         displayName: name.trim(),
         username: username.trim().toLowerCase(),

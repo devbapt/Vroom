@@ -191,13 +191,10 @@ const styles = StyleSheet.create({
     borderRadius: (AVATAR_SIZE + 4) / 2,
     borderWidth: 2.5,
     borderColor: C.ringUnseen,
-    padding: 2,
     overflow: 'hidden',
   },
   avatar: {
-    width: AVATAR_SIZE,
-    height: AVATAR_SIZE,
-    borderRadius: AVATAR_SIZE / 2,
+    flex: 1,
   },
   avatarPlaceholder: {
     flex: 1,
