@@ -150,13 +150,13 @@ function CineDrivePost({ post, index, postHeight, chapterTopOffset, onLike, onSa
         pointerEvents="none"
       />
 
-      {/* Chapter card — top left */}
+      {/* Chapter card — sits below the page indicator dots */}
       <ChapterCard
         type={post.type}
         index={index}
         location={post.location}
         buildPhase={buildPhase}
-        topOffset={chapterTopOffset}
+        topOffset={chapterTopOffset !== undefined ? chapterTopOffset + 18 : undefined}
       />
 
       {/* Photo counter — horizontal dots below overlay */}
@@ -221,7 +221,7 @@ const styles = StyleSheet.create({
   // Author Block
   authorBlock: {
     position: 'absolute',
-    bottom: 118,
+    bottom: 90,
     left: 18,
     flexDirection: 'row',
     alignItems: 'center',

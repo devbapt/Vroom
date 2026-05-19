@@ -38,7 +38,6 @@ function ChapterCard({ type, index, location, buildPhase, topOffset }: Props) {
     <View style={[styles.container, topOffset !== undefined && { top: topOffset }]}>
       <View style={styles.bar} />
       <View style={styles.textBadge}>
-        <Text style={styles.chLine}>{`CH. ${chNum}`}</Text>
         <Text style={styles.sessionLine} numberOfLines={1}>{subtitle}</Text>
       </View>
     </View>
@@ -70,7 +69,7 @@ const styles = StyleSheet.create({
   },
   chLine: {
     fontFamily: MONO,
-    fontSize: 9,
+    fontSize: 5,
     letterSpacing: 1.5,
     color: C.whiteFaint,
   },
