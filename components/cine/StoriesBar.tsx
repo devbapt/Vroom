@@ -7,14 +7,13 @@ import {
   StyleSheet,
 } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
-import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
 import StoryViewer from '../../screens/StoryViewer';
 import { useAppContext } from '../../context';
+import { supabase } from '../../supabaseClient';
 import type { FeedStory } from '../../context/AppContext';
 
-const BAR_HEIGHT = 92;
-const AVATAR_SIZE = 60;
+const BAR_HEIGHT = 72;
+const AVATAR_SIZE = 50;
 
 const C = {
   bg: '#140102',
@@ -23,7 +22,6 @@ const C = {
   whiteSoft: 'rgba(255,255,255,0.7)',
   ringUnseen: '#E50914',
   ringSeen: 'rgba(255,255,255,0.25)',
-  addBadgeBg: '#E50914',
 };
 
 const MONO = 'Courier';
@@ -54,76 +52,27 @@ const StoryItem = memo(function StoryItem({ story, isSeen, onPress }: StoryItemP
   );
 });
 
-// ─── My Story Item ────────────────────────────────────────────────────────────
-
-interface MyStoryItemProps {
-  avatar: string;
-  hasActiveStory: boolean;
-  onPress: () => void;
-}
-
-const MyStoryItem = memo(function MyStoryItem({ avatar, hasActiveStory, onPress }: MyStoryItemProps) {
-  return (
-    <Pressable style={styles.storyItem} onPress={onPress} hitSlop={4}>
-      <View style={styles.myStoryWrapper}>
-        <View style={[
-          styles.avatarRing,
-          { borderColor: hasActiveStory ? C.ringUnseen : 'rgba(255,255,255,0.3)' },
-        ]}>
-          {avatar ? (
-            <ExpoImage
-              source={avatar}
-              style={styles.avatar}
-              contentFit="cover"
-              cachePolicy="memory-disk"
-            />
-          ) : (
-            <View style={styles.avatarPlaceholder}>
-              <Ionicons name="person-outline" size={28} color="rgba(255,255,255,0.45)" />
-            </View>
-          )}
-        </View>
-        <View style={styles.addBadge}>
-          <Ionicons name="add" size={12} color={C.white} />
-        </View>
-      </View>
-      <Text style={styles.storyLabel} numberOfLines={1}>
-        Ma story
-      </Text>
-    </Pressable>
-  );
-});
-
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default memo(function StoriesBar() {
-  const { feedStories, markStoryAsViewed, user } = useAppContext();
-  const navigation = useNavigation<any>();
+  const { feedStories, markStoryAsViewed, removeFeedStory, user } = useAppContext();
 
   const [viewerVisible, setViewerVisible]     = useState(false);
   const [viewerHighlightId, setViewerHighlightId] = useState('');
-  const [viewerStories, setViewerStories]     = useState<{ id: string; image: string }[]>([]);
+  const [viewerStories, setViewerStories]     = useState<{ id: string; image: string; userId?: string }[]>([]);
 
   const currentUserId = user?.id ?? '';
-  const currentAvatar = user?.avatar ?? '';
 
-  const myStory = feedStories.find(s => s.userId === currentUserId);
   const otherStories = feedStories.filter(s => s.userId !== currentUserId);
 
   const openStory = useCallback((story: FeedStory) => {
     markStoryAsViewed(story.id);
     setViewerHighlightId(story.id);
-    setViewerStories([{ id: story.id, image: story.imageUrl }]);
+    setViewerStories([{ id: story.id, image: story.imageUrl, userId: story.userId }]);
     setViewerVisible(true);
   }, [markStoryAsViewed]);
 
-  const openMyStory = useCallback(() => {
-    if (myStory) {
-      openStory(myStory);
-    } else {
-      navigation.navigate('Profile', { screen: 'EditProfile' });
-    }
-  }, [myStory, openStory, navigation]);
+  if (otherStories.length === 0) return null;
 
   return (
     <View style={styles.container}>
@@ -132,14 +81,6 @@ export default memo(function StoriesBar() {
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-        {/* My story always first */}
-        <MyStoryItem
-          avatar={currentAvatar}
-          hasActiveStory={!!myStory}
-          onPress={openMyStory}
-        />
-
-        {/* Other users' stories */}
         {otherStories.map(story => {
           const isSeen = story.viewedBy.includes(currentUserId);
           return (
@@ -153,12 +94,13 @@ export default memo(function StoriesBar() {
         })}
       </ScrollView>
 
-      {/* StoryViewer embedded as modal */}
       <StoryViewer
         visible={viewerVisible}
         highlightId={viewerHighlightId}
         onClose={() => setViewerVisible(false)}
         stories={viewerStories}
+        currentUserId={user?.id}
+        onStoryDelete={(id) => { removeFeedStory(id); setViewerVisible(false); }}
       />
     </View>
   );
@@ -182,45 +124,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     width: AVATAR_SIZE + 8,
   },
-  myStoryWrapper: {
-    position: 'relative',
-  },
   avatarRing: {
     width: AVATAR_SIZE + 4,
     height: AVATAR_SIZE + 4,
     borderRadius: (AVATAR_SIZE + 4) / 2,
     borderWidth: 2.5,
-    borderColor: C.ringUnseen,
     overflow: 'hidden',
   },
   avatar: {
     flex: 1,
-  },
-  avatarPlaceholder: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.06)',
-  },
-  addBadge: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: C.addBadgeBg,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: C.bg,
   },
   storyLabel: {
     fontFamily: MONO,
     fontSize: 9,
     letterSpacing: 0.5,
     color: C.whiteSoft,
-    marginTop: 5,
+    marginTop: 4,
     maxWidth: AVATAR_SIZE + 8,
     textAlign: 'center',
   },

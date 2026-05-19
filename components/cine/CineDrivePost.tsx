@@ -34,11 +34,12 @@ const MONO = 'Courier';
 interface PageIndicatorProps {
   count: number;
   activeIndex: number;
+  top?: number;
 }
 
-const PageIndicator = memo(function PageIndicator({ count, activeIndex }: PageIndicatorProps) {
+const PageIndicator = memo(function PageIndicator({ count, activeIndex, top }: PageIndicatorProps) {
   return (
-    <View style={styles.pageIndicator}>
+    <View style={[styles.pageIndicator, top !== undefined && { top }]}>
       {Array.from({ length: count }).map((_, i) => (
         <View
           key={i}
@@ -66,12 +67,14 @@ const AuthorBlock = memo(function AuthorBlock({ post, onUserPress }: AuthorBlock
 
   return (
     <View style={styles.authorBlock}>
-      <ExpoImage
-        source={post.user.avatar}
-        style={styles.authorAvatar}
-        contentFit="cover"
-        cachePolicy="memory-disk"
-      />
+      <Pressable onPress={() => onUserPress?.(post.user.id, post.user.username)} hitSlop={4}>
+        <ExpoImage
+          source={post.user.avatar}
+          style={styles.authorAvatar}
+          contentFit="cover"
+          cachePolicy="memory-disk"
+        />
+      </Pressable>
       <View style={styles.authorText}>
         <Pressable
           onPress={() => onUserPress?.(post.user.id, post.user.username)}
@@ -91,13 +94,14 @@ interface Props {
   post: CineDrivePostType;
   index: number;
   postHeight: number;
+  chapterTopOffset?: number;
   onLike: (postId: string) => void;
   onSave: (postId: string) => void;
   onComment?: (postId: string) => void;
   onUserPress?: (userId: string, username: string) => void;
 }
 
-function CineDrivePost({ post, index, postHeight, onLike, onSave, onComment, onUserPress }: Props) {
+function CineDrivePost({ post, index, postHeight, chapterTopOffset, onLike, onSave, onComment, onUserPress }: Props) {
   const [activePhotoIndex, setActivePhotoIndex] = useState(0);
 
   const photos = post.photos && post.photos.length > 0 ? post.photos : [post.image];
@@ -152,11 +156,12 @@ function CineDrivePost({ post, index, postHeight, onLike, onSave, onComment, onU
         index={index}
         location={post.location}
         buildPhase={buildPhase}
+        topOffset={chapterTopOffset}
       />
 
-      {/* Photo counter — right edge */}
+      {/* Photo counter — horizontal dots below overlay */}
       {hasMultiplePhotos && (
-        <PageIndicator count={photos.length} activeIndex={activePhotoIndex} />
+        <PageIndicator count={photos.length} activeIndex={activePhotoIndex} top={chapterTopOffset} />
       )}
 
       {/* Action stack — right side */}
@@ -189,31 +194,34 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
 
-  // Page Indicator
+  // Page Indicator — horizontal dots centered at top
   pageIndicator: {
     position: 'absolute',
-    top: 90,
-    right: 14,
+    top: 12,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'center',
     alignItems: 'center',
-    gap: 4,
+    gap: 5,
   },
   pageTick: {
-    width: 2,
-    borderRadius: 1,
+    height: 2.5,
+    borderRadius: 2,
   },
   pageTickActive: {
-    height: 18,
+    width: 22,
     backgroundColor: C.pageActive,
   },
   pageTickInactive: {
-    height: 8,
+    width: 7,
     backgroundColor: C.pageInactive,
   },
 
   // Author Block
   authorBlock: {
     position: 'absolute',
-    bottom: 110,
+    bottom: 118,
     left: 18,
     flexDirection: 'row',
     alignItems: 'center',

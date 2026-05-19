@@ -10,6 +10,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Dimensions,
+  ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image as ExpoImage } from 'expo-image';
@@ -17,6 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useNavigation } from '@react-navigation/native';
 import { useAppContext } from '../context';
+import { supabase } from '../supabaseClient';
 import type {
   VehicleTransmission,
   VehicleDrivetrain,
@@ -206,10 +208,11 @@ function BrandInput({
 export default function AddVehicleScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
-  const { addVehicle } = useAppContext();
+  const { user } = useAppContext();
 
   // Identity
-  const [imageUrl, setImageUrl] = useState('');
+  const [imageUri, setImageUri] = useState('');
+  const [imageBase64, setImageBase64] = useState<string | null>(null);
   const [brand, setBrand] = useState('');
   const [model, setModel] = useState('');
   const [year, setYear] = useState('');
@@ -230,8 +233,9 @@ export default function AddVehicleScreen() {
 
   // Notes
   const [notes, setNotes] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const isValid = imageUrl.trim() !== '' && brand.trim() !== '' && model.trim() !== '' && year.trim().length === 4;
+  const isValid = imageUri.trim() !== '' && brand.trim() !== '' && model.trim() !== '' && year.trim().length === 4;
 
   const pickImage = useCallback(async () => {
     const { status: perm } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -244,33 +248,75 @@ export default function AddVehicleScreen() {
       allowsEditing: true,
       aspect: [16, 9],
       quality: 0.85,
+      base64: true,
     });
     if (!result.canceled && result.assets[0]) {
-      setImageUrl(result.assets[0].uri);
+      const asset = result.assets[0];
+      setImageUri(asset.uri);
+
+      let b64 = asset.base64 ?? null;
+      if (!b64 && asset.uri?.startsWith('data:')) {
+        const comma = asset.uri.indexOf(',');
+        b64 = comma >= 0 ? asset.uri.substring(comma + 1) : null;
+      }
+      if (b64 && b64.includes(';base64,')) {
+        b64 = b64.split(';base64,')[1] ?? b64;
+      }
+      setImageBase64(b64);
     }
   }, []);
 
-  const handleSubmit = useCallback(() => {
-    if (!isValid) return;
-    addVehicle({
-      imageUrl,
-      brand: brand.trim(),
-      model: model.trim(),
-      year: parseInt(year, 10),
-      nickname: nickname.trim() || undefined,
-      power: power.trim() || undefined,
-      acceleration: acceleration.trim() || undefined,
-      transmission,
-      drivetrain,
-      fuel,
-      color: color.trim() || undefined,
-      mileage: mileage ? parseInt(mileage, 10) : undefined,
-      acquiredAt: acquiredAt.trim() || undefined,
-      status,
-      notes: notes.trim() || undefined,
-    });
-    navigation.goBack();
-  }, [isValid, addVehicle, imageUrl, brand, model, year, nickname, power, acceleration, transmission, drivetrain, fuel, color, mileage, acquiredAt, status, notes, navigation]);
+  const handleSubmit = useCallback(async () => {
+    if (!isValid || isSubmitting || !user?.id) return;
+    setIsSubmitting(true);
+
+    try {
+      let publicUrl = imageUri;
+
+      if (imageBase64) {
+        const binaryStr = atob(imageBase64);
+        const bytes = new Uint8Array(binaryStr.length);
+        for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);
+
+        const filePath = `${user.id}/${Date.now()}.jpg`;
+        const { error: uploadError } = await supabase.storage
+          .from('garage')
+          .upload(filePath, bytes, { contentType: 'image/jpeg' });
+
+        if (uploadError) throw uploadError;
+
+        const { data: urlData } = supabase.storage.from('garage').getPublicUrl(filePath);
+        publicUrl = urlData.publicUrl;
+      }
+
+      const { error: insertError } = await supabase.from('garage_vehicles').insert({
+        user_id: user.id,
+        image_url: publicUrl,
+        brand: brand.trim(),
+        model: model.trim(),
+        year: parseInt(year, 10),
+        nickname: nickname.trim() || null,
+        power: power.trim() || null,
+        acceleration: acceleration.trim() || null,
+        transmission: transmission ?? null,
+        drivetrain: drivetrain ?? null,
+        fuel: fuel ?? null,
+        color: color.trim() || null,
+        mileage: mileage ? parseInt(mileage, 10) : null,
+        acquired_at: acquiredAt.trim() || null,
+        status: status ?? null,
+        notes: notes.trim() || null,
+      });
+
+      if (insertError) throw insertError;
+
+      navigation.goBack();
+    } catch (_) {
+      Alert.alert('Erreur', 'Impossible d\'ajouter le véhicule.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [isValid, isSubmitting, user?.id, imageUri, imageBase64, brand, model, year, nickname, power, acceleration, transmission, drivetrain, fuel, color, mileage, acquiredAt, status, notes, navigation]);
 
   return (
     <KeyboardAvoidingView
@@ -295,10 +341,10 @@ export default function AddVehicleScreen() {
         <SectionTitle label="PHOTO PRINCIPALE *" />
 
         <Pressable style={styles.photoArea} onPress={pickImage}>
-          {imageUrl ? (
+          {imageUri ? (
             <>
               <ExpoImage
-                source={imageUrl}
+                source={imageUri}
                 style={styles.photoPreview}
                 contentFit="cover"
               />
@@ -377,15 +423,21 @@ export default function AddVehicleScreen() {
 
         {/* ── CTA ── */}
         <Pressable
-          style={[styles.submitBtn, !isValid && styles.submitBtnDisabled]}
+          style={[styles.submitBtn, (!isValid || isSubmitting) && styles.submitBtnDisabled]}
           onPress={handleSubmit}
-          disabled={!isValid}
+          disabled={!isValid || isSubmitting}
         >
-          <Ionicons name="car-sport-outline" size={18} color={C.white} />
-          <Text style={styles.submitBtnText}>AJOUTER AU GARAGE</Text>
+          {isSubmitting ? (
+            <ActivityIndicator size="small" color={C.white} />
+          ) : (
+            <>
+              <Ionicons name="car-sport-outline" size={18} color={C.white} />
+              <Text style={styles.submitBtnText}>AJOUTER AU GARAGE</Text>
+            </>
+          )}
         </Pressable>
 
-        {!isValid && (
+        {!isValid && !isSubmitting && (
           <Text style={styles.validationHint}>
             Photo, marque, modèle et année requis
           </Text>

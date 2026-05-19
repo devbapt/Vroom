@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -68,7 +68,7 @@ interface GarageCar {
 export default function ProfileScreen() {
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
-  const { language, user, cinePosts, vehicles, updateProfileAvatar } = useAppContext();
+  const { language, user, updateProfileAvatar } = useAppContext();
   const t = getTranslation(language);
 
   const [selectedCarId, setSelectedCarId] = useState<string | null>(null);
@@ -81,27 +81,47 @@ export default function ProfileScreen() {
   const [slideAnim] = useState(new Animated.Value(600));
   const [addSlideAnim] = useState(new Animated.Value(600));
   const [refreshing, setRefreshing] = useState(false);
+  const [myPublications, setMyPublications] = useState<any[]>([]);
   const [highlights, setHighlights] = useState<{ id: string; name: string; image: string }[]>([]);
-  // Merge static mock cars with dynamically added vehicles from context
-  const contextGarageCars: GarageCar[] = vehicles.map(v => ({
-    id: v.id,
-    name: `${v.brand} ${v.model}`,
-    year: String(v.year),
-    body: v.status ?? '—',
-    power: v.power ?? '—',
-    image: v.imageUrl,
-    images: [v.imageUrl],
-    specs: {
-      km: v.mileage ? v.mileage.toLocaleString() : '—',
-      motor: v.fuel ?? '—',
-      color: v.color ?? '—',
-      gearbox: v.transmission ?? '—',
-    },
-    history: v.notes ?? '',
-  }));
-  const garageItems: GarageCar[] = [...contextGarageCars];
+  const [garageItems, setGarageItems] = useState<GarageCar[]>([]);
 
-  const myPublications = cinePosts.filter(p => p.user.id === user?.id);
+  useEffect(() => {
+    if (!user?.id) return;
+    supabase
+      .from('posts')
+      .select('id, type, image_urls, created_at')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .then(({ data }) => { if (data) setMyPublications(data); });
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    supabase
+      .from('garage_vehicles')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .then(({ data }) => {
+        if (!data) return;
+        setGarageItems(data.map((v: any) => ({
+          id: v.id,
+          name: `${v.brand} ${v.model}`,
+          year: String(v.year),
+          body: v.status ?? '—',
+          power: v.power ?? '—',
+          image: v.image_url ?? '',
+          images: [v.image_url ?? ''],
+          specs: {
+            km: v.mileage ? Number(v.mileage).toLocaleString() : '—',
+            motor: v.fuel ?? '—',
+            color: v.color ?? '—',
+            gearbox: v.transmission ?? '—',
+          },
+          history: v.notes ?? '',
+        })));
+      });
+  }, [user?.id]);
 
   const selectedCar = garageItems.find((c) => c.id === selectedCarId) ?? null;
 
@@ -255,6 +275,23 @@ export default function ProfileScreen() {
     } catch (_) {}
   };
 
+  const handleDeletePost = useCallback((postId: string) => {
+    const doDelete = async () => {
+      await supabase.from('posts').delete().eq('id', postId);
+      setMyPublications(prev => prev.filter((p: any) => p.id !== postId));
+    };
+    if (Platform.OS === 'web') {
+      if ((window as any).confirm('Supprimer ce post ? Cette action est irréversible.')) {
+        doDelete();
+      }
+    } else {
+      Alert.alert('Supprimer ce post ?', 'Cette action est irréversible.', [
+        { text: 'Annuler', style: 'cancel' },
+        { text: 'Supprimer', style: 'destructive', onPress: doDelete },
+      ]);
+    }
+  }, []);
+
   const handleDeleteHighlight = (id: string) => {
     Alert.alert(t.profile.delete_highlight, t.profile.delete_confirm, [
       { text: t.profile.cancel, style: 'cancel' },
@@ -299,6 +336,7 @@ export default function ProfileScreen() {
           onPickAvatar={pickAvatar}
           onConfirmAvatar={confirmAvatar}
           onCancelAvatar={cancelAvatar}
+          onDeletePost={handleDeletePost}
         />
       )}
 
@@ -399,6 +437,7 @@ function ProfileGridView({
   onPickAvatar,
   onConfirmAvatar,
   onCancelAvatar,
+  onDeletePost,
 }: {
   insets: ReturnType<typeof useSafeAreaInsets>;
   activeTab: string;
@@ -422,6 +461,7 @@ function ProfileGridView({
   onPickAvatar: () => void;
   onConfirmAvatar: () => void;
   onCancelAvatar: () => void;
+  onDeletePost: (postId: string) => void;
 }) {
   const t = getTranslation(language);
   const username = user?.username ?? '';
@@ -622,9 +662,9 @@ function ProfileGridView({
               <View style={styles.emptyTab} />
             ) : (
               posts.map((post: any) => (
-                <TouchableOpacity key={post.id} style={styles.pubItem} activeOpacity={0.9}>
+                <View key={post.id} style={styles.pubItem}>
                   <ExpoImage
-                    source={post.photos?.[0] ?? post.image}
+                    source={post.image_urls?.[0] ?? post.photos?.[0] ?? post.image}
                     style={StyleSheet.absoluteFillObject}
                     contentFit="cover"
                     placeholder={FALLBACK}
@@ -635,7 +675,14 @@ function ProfileGridView({
                       <Ionicons name={(POST_TYPE_ICON[post.type] ?? 'ellipse') as any} size={10} color="#FFF" />
                     </View>
                   )}
-                </TouchableOpacity>
+                  <Pressable
+                    style={styles.pubMenuBtn}
+                    onPress={() => onDeletePost(post.id)}
+                    hitSlop={6}
+                  >
+                    <Text style={styles.pubMenuText}>···</Text>
+                  </Pressable>
+                </View>
               ))
             )}
           </View>
@@ -889,6 +936,12 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.55)',
     justifyContent: 'center', alignItems: 'center',
   },
+  pubMenuBtn: {
+    position: 'absolute', top: 4, right: 4,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderRadius: 4, paddingHorizontal: 5, paddingVertical: 1,
+  },
+  pubMenuText: { fontSize: 11, color: '#FFF', fontWeight: '700', letterSpacing: 1 },
 
   emptyTab: { alignItems: 'center', paddingVertical: 60, gap: 12 },
   emptyTabText: { color: C.muted, fontSize: 12 },

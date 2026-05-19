@@ -16,6 +16,7 @@ import { Image as ExpoImage } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useNavigation } from '@react-navigation/native';
+import { supabase } from '../supabaseClient';
 import { useAppContext } from '../context';
 import type {
   CineDrivePostType,
@@ -187,7 +188,7 @@ export default function CreatePostScreen() {
   const navigation = useNavigation<any>();
   const { user, addCinePost } = useAppContext();
 
-  const [photos, setPhotos] = useState<string[]>([]);
+  const [photos, setPhotos] = useState<{ uri: string; base64: string | null }[]>([]);
   const [postType, setPostType] = useState<CineDrivePostType>('road_trip');
   const [brand, setBrand] = useState('');
   const [model, setModel] = useState('');
@@ -217,18 +218,29 @@ export default function CreatePostScreen() {
       allowsMultipleSelection: true,
       quality: 0.85,
       selectionLimit: 6,
+      base64: true,
     });
     if (!result.canceled) {
-      const uris = result.assets.map(a => a.uri);
-      setPhotos(prev => [...prev, ...uris].slice(0, 6));
+      const picked = result.assets.map(a => {
+        let b64: string | null = a.base64 ?? null;
+        if (!b64 && a.uri?.startsWith('data:')) {
+          const comma = a.uri.indexOf(',');
+          b64 = comma >= 0 ? a.uri.substring(comma + 1) : null;
+        }
+        if (b64?.includes(';base64,')) b64 = b64.split(';base64,')[1] ?? b64;
+        return { uri: a.uri, base64: b64 };
+      });
+      setPhotos(prev => [...prev, ...picked].slice(0, 6));
     }
   }, []);
+
+  const [isPublishing, setIsPublishing] = useState(false);
 
   const removePhoto = useCallback((index: number) => {
     setPhotos(prev => prev.filter((_, i) => i !== index));
   }, []);
 
-  const handlePublish = useCallback(() => {
+  const handlePublish = useCallback(async () => {
     if (photos.length === 0) {
       Alert.alert('Photo requise', 'Ajoute au moins une photo pour publier.');
       return;
@@ -237,36 +249,86 @@ export default function CreatePostScreen() {
       Alert.alert('Véhicule requis', 'Renseigne la marque de ton véhicule.');
       return;
     }
+    if (!user?.id) return;
 
-    const hud = buildHUD(postType, hudValues, rarity);
-    const newPost: CineDrivePost = {
-      id: Date.now().toString(),
-      type: postType,
-      user: {
-        id: user?.id ?? 'user_123',
-        username: user?.username ?? 'user',
-        avatar: user?.avatar ?? '',
-      },
-      vehicle: {
-        brand: brand.toUpperCase().trim(),
-        model: model.toUpperCase().trim(),
-        year: year ? parseInt(year, 10) : undefined,
-      },
-      location: location.trim() || undefined,
-      image: photos[0],
-      photos,
-      pages: photos.map((_, i) => ({ id: `pg${i + 1}`, type: 'photo' as const })),
-      hud,
-      description: description.trim() || undefined,
-      likes: 0,
-      isLiked: false,
-      comments: 0,
-      isSaved: false,
-      createdAt: new Date().toISOString(),
-    };
+    setIsPublishing(true);
+    try {
+      const timestamp = Date.now();
+      const imageUrls: string[] = [];
 
-    addCinePost(newPost);
-    navigation.goBack();
+      // Upload each photo to Supabase Storage
+      for (let i = 0; i < photos.length; i++) {
+        const photo = photos[i];
+        if (!photo.base64) continue;
+
+        const binaryStr = atob(photo.base64);
+        const bytes = new Uint8Array(binaryStr.length);
+        for (let j = 0; j < binaryStr.length; j++) bytes[j] = binaryStr.charCodeAt(j);
+
+        const filePath = `${user.id}/${timestamp}/${i}.jpg`;
+        const { error: uploadError } = await supabase.storage
+          .from('posts')
+          .upload(filePath, bytes, { contentType: 'image/jpeg' });
+
+        if (!uploadError) {
+          const { data: urlData } = supabase.storage.from('posts').getPublicUrl(filePath);
+          imageUrls.push(urlData.publicUrl);
+        }
+      }
+
+      const hud = buildHUD(postType, hudValues, rarity);
+
+      const { data: inserted, error: insertError } = await supabase
+        .from('posts')
+        .insert({
+          user_id: user.id,
+          type: postType,
+          brand: brand.trim().toUpperCase(),
+          model: model.trim().toUpperCase(),
+          year: year ? parseInt(year, 10) : null,
+          location: location.trim() || null,
+          description: description.trim() || null,
+          image_urls: imageUrls,
+          hud_data: hud,
+        })
+        .select()
+        .single();
+
+      if (insertError) {
+        Alert.alert('Erreur', 'Impossible de publier le post.');
+        return;
+      }
+
+      // Add to local feed immediately
+      const newPost: CineDrivePost = {
+        id: inserted?.id ?? String(timestamp),
+        type: postType,
+        user: { id: user.id, username: user.username ?? '', avatar: user.avatar ?? '' },
+        vehicle: {
+          brand: brand.trim().toUpperCase(),
+          model: model.trim().toUpperCase(),
+          year: year ? parseInt(year, 10) : undefined,
+        },
+        location: location.trim() || undefined,
+        image: imageUrls[0] ?? photos[0]?.uri ?? '',
+        photos: imageUrls.length > 0 ? imageUrls : photos.map(p => p.uri),
+        pages: imageUrls.map((_, i) => ({ id: `pg${i + 1}`, type: 'photo' as const })),
+        hud,
+        description: description.trim() || undefined,
+        likes: 0,
+        isLiked: false,
+        comments: 0,
+        isSaved: false,
+        createdAt: new Date().toISOString(),
+      };
+
+      addCinePost(newPost);
+      navigation.goBack();
+    } catch (e) {
+      Alert.alert('Erreur', 'Une erreur est survenue lors de la publication.');
+    } finally {
+      setIsPublishing(false);
+    }
   }, [photos, brand, model, year, location, description, postType, hudValues, rarity, user, addCinePost, navigation]);
 
   const hudFields = HUD_FIELDS[postType];
@@ -285,8 +347,9 @@ export default function CreatePostScreen() {
         <Pressable
           style={({ pressed }) => [styles.publishBtn, pressed && { opacity: 0.8 }]}
           onPress={handlePublish}
+          disabled={isPublishing}
         >
-          <Text style={styles.publishBtnText}>PUBLIER</Text>
+          <Text style={styles.publishBtnText}>{isPublishing ? '...' : 'PUBLIER'}</Text>
         </Pressable>
       </View>
 
@@ -303,9 +366,9 @@ export default function CreatePostScreen() {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.photoRow}
         >
-          {photos.map((uri, i) => (
+          {photos.map((photo, i) => (
             <View key={i} style={styles.photoThumbWrapper}>
-              <ExpoImage source={uri} style={styles.photoThumb} contentFit="cover" />
+              <ExpoImage source={photo.uri} style={styles.photoThumb} contentFit="cover" />
               <Pressable
                 style={styles.removePhotoBtn}
                 onPress={() => removePhoto(i)}

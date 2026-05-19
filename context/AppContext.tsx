@@ -165,6 +165,8 @@ export interface AppContextType {
   feedStories: FeedStory[];
   markStoryAsViewed: (storyId: string) => void;
   addFeedStory: (story: Omit<FeedStory, 'id' | 'createdAt' | 'viewedBy'>) => void;
+  removeFeedStory: (storyId: string) => void;
+  loadStories: () => Promise<void>;
 
   // Vehicles (garage)
   vehicles: Vehicle[];
@@ -244,19 +246,44 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   const changeLanguage = useCallback((lang: Language) => { setLanguageState(lang); }, []);
 
-  const toggleLikeCinePost = useCallback((postId: string) => {
-    setCinePosts(prev =>
-      prev.map(p =>
+  const toggleLikeCinePost = useCallback(async (postId: string) => {
+    let currentlyLiked = false;
+    setCinePosts(prev => {
+      const post = prev.find(p => p.id === postId);
+      currentlyLiked = post?.isLiked ?? false;
+      return prev.map(p =>
         p.id === postId
           ? { ...p, isLiked: !p.isLiked, likes: p.isLiked ? p.likes - 1 : p.likes + 1 }
           : p
-      )
-    );
-  }, []);
+      );
+    });
 
-  const toggleSaveCinePost = useCallback((postId: string) => {
-    setCinePosts(prev => prev.map(p => (p.id === postId ? { ...p, isSaved: !p.isSaved } : p)));
-  }, []);
+    if (!user?.id) return;
+
+    if (currentlyLiked) {
+      await supabase.from('post_likes').delete().eq('post_id', postId).eq('user_id', user.id);
+    } else {
+      await supabase.from('post_likes').insert({ post_id: postId, user_id: user.id });
+    }
+  }, [user?.id]);
+
+  const toggleSaveCinePost = useCallback(async (postId: string) => {
+    // Read current saved state before optimistic update
+    let currentlySaved = false;
+    setCinePosts(prev => {
+      const post = prev.find(p => p.id === postId);
+      currentlySaved = post?.isSaved ?? false;
+      return prev.map(p => p.id === postId ? { ...p, isSaved: !p.isSaved } : p);
+    });
+
+    if (!user?.id) return;
+
+    if (currentlySaved) {
+      await supabase.from('saved_posts').delete().eq('post_id', postId).eq('user_id', user.id);
+    } else {
+      await supabase.from('saved_posts').insert({ post_id: postId, user_id: user.id });
+    }
+  }, [user?.id]);
 
   const addCinePost = useCallback((post: CineDrivePost) => {
     setCinePosts(prev => [post, ...prev]);
@@ -284,6 +311,30 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     setFeedStories(prev => [newStory, ...prev]);
   }, []);
 
+  const removeFeedStory = useCallback((storyId: string) => {
+    setFeedStories(prev => prev.filter(s => s.id !== storyId));
+  }, []);
+
+  const loadStories = useCallback(async () => {
+    const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const { data } = await supabase
+      .from('stories')
+      .select('id, user_id, image_url, created_at, profiles!user_id(id, username, avatar_url)')
+      .gte('created_at', since)
+      .order('created_at', { ascending: false });
+
+    if (!data) return;
+    setFeedStories(data.map((row: any) => ({
+      id: row.id,
+      userId: row.user_id,
+      username: row.profiles?.username ?? '',
+      avatar: row.profiles?.avatar_url ?? '',
+      imageUrl: row.image_url,
+      createdAt: row.created_at,
+      viewedBy: [],
+    })));
+  }, []);
+
   // Vehicles
   const addVehicle = useCallback((v: Omit<Vehicle, 'id' | 'userId' | 'createdAt'>) => {
     const newVehicle: Vehicle = {
@@ -302,7 +353,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const fetchAndSetProfile = async (userId: string) => {
     const { data } = await supabase
       .from('profiles')
-      .select('id, username, full_name, avatar_url, bio')
+      .select('id, username, full_name, avatar_url, bio, followers_count')
       .eq('id', userId)
       .single();
     setUser({
@@ -311,7 +362,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       displayName: data?.full_name ?? data?.username ?? '',
       avatar: data?.avatar_url ?? '',
       bio: data?.bio ?? '',
-      followersCount: 0,
+      followersCount: data?.followers_count ?? 0,
       followingCount: 0,
       postsCount: 0,
       isPrivate: false,
@@ -321,11 +372,12 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) fetchAndSetProfile(session.user.id);
+      if (session?.user) { fetchAndSetProfile(session.user.id); loadStories(); }
     });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user) {
         fetchAndSetProfile(session.user.id);
+        loadStories();
       } else {
         setUser(null);
         setHighlights([]);
@@ -369,6 +421,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     feedStories: activeStories,
     markStoryAsViewed,
     addFeedStory,
+    removeFeedStory,
+    loadStories,
     vehicles,
     addVehicle,
     removeVehicle,

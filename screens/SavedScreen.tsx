@@ -1,4 +1,4 @@
-import React, { memo } from 'react';
+import React, { memo, useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -7,12 +7,14 @@ import {
   FlatList,
   Dimensions,
   ListRenderItemInfo,
+  ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image as ExpoImage } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { useAppContext } from '../context';
-import type { CineDrivePost } from '../context/AppContext';
+import { supabase } from '../supabaseClient';
+import type { CineDrivePost, AnyHUD } from '../context/AppContext';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -31,6 +33,36 @@ const GRID_COLS = 2;
 const ITEM_SIZE = (SCREEN_WIDTH - GRID_GAP) / GRID_COLS;
 
 type SavedScreenProps = { navigation: any };
+
+function mapRowToSaved(row: any): CineDrivePost {
+  const profile = row.profiles ?? {};
+  const imageUrls: string[] = row.image_urls ?? [];
+  return {
+    id: row.id,
+    type: row.type,
+    user: {
+      id: profile.id ?? row.user_id,
+      username: profile.username ?? '',
+      avatar: profile.avatar_url ?? '',
+    },
+    vehicle: {
+      brand: row.brand ?? '',
+      model: row.model ?? '',
+      year: row.year ?? undefined,
+    },
+    location: row.location ?? undefined,
+    image: imageUrls[0] ?? '',
+    photos: imageUrls,
+    pages: imageUrls.map((_: string, i: number) => ({ id: `pg${i + 1}`, type: 'photo' as const })),
+    hud: (row.hud_data as AnyHUD) ?? ({ kind: 'daily', power: '—', acceleration: '—', transmission: '—' } as AnyHUD),
+    description: row.description ?? undefined,
+    likes: row.likes_count ?? 0,
+    isLiked: false,
+    comments: row.comments_count ?? 0,
+    isSaved: true,
+    createdAt: row.created_at,
+  };
+}
 
 const SavedItem = memo(function SavedItem({ item, onUnsave }: { item: CineDrivePost; onUnsave: (id: string) => void }) {
   const thumb = item.photos?.[0] ?? item.image;
@@ -72,10 +104,54 @@ const SavedItem = memo(function SavedItem({ item, onUnsave }: { item: CineDriveP
 
 export default function SavedScreen({ navigation }: SavedScreenProps) {
   const insets = useSafeAreaInsets();
-  const { savedCinePosts, toggleSaveCinePost } = useAppContext();
+  const { user } = useAppContext();
+
+  const [savedPosts, setSavedPosts] = useState<CineDrivePost[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!user?.id) { setLoading(false); return; }
+    let cancelled = false;
+
+    const fetch = async () => {
+      setLoading(true);
+      const { data: savedRows } = await supabase
+        .from('saved_posts')
+        .select('post_id')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      const ids = (savedRows ?? []).map((r: any) => r.post_id);
+      if (ids.length === 0) {
+        if (!cancelled) { setSavedPosts([]); setLoading(false); }
+        return;
+      }
+
+      const { data: posts } = await supabase
+        .from('posts')
+        .select('*, profiles!user_id(id, username, full_name, avatar_url)')
+        .in('id', ids);
+
+      if (!cancelled) {
+        setSavedPosts((posts ?? []).map(mapRowToSaved));
+        setLoading(false);
+      }
+    };
+
+    fetch();
+    return () => { cancelled = true; };
+  }, [user?.id]);
+
+  const handleUnsave = useCallback(async (postId: string) => {
+    setSavedPosts(prev => prev.filter(p => p.id !== postId));
+    if (user?.id) {
+      await supabase.from('saved_posts').delete()
+        .eq('post_id', postId).eq('user_id', user.id);
+    }
+  }, [user?.id]);
 
   const renderItem = ({ item }: ListRenderItemInfo<CineDrivePost>) => (
-    <SavedItem item={item} onUnsave={toggleSaveCinePost} />
+    <SavedItem item={item} onUnsave={handleUnsave} />
   );
 
   return (
@@ -89,21 +165,24 @@ export default function SavedScreen({ navigation }: SavedScreenProps) {
           <View style={styles.accentBar} />
           <Text style={styles.headerTitle}>ENREGISTRÉS</Text>
         </View>
-        <Text style={styles.headerCount}>{savedCinePosts.length}</Text>
+        <Text style={styles.headerCount}>{savedPosts.length}</Text>
       </View>
 
-      {/* Grid */}
-      <FlatList
-        data={savedCinePosts}
-        keyExtractor={(item) => item.id}
-        renderItem={renderItem}
-        numColumns={GRID_COLS}
-        columnWrapperStyle={styles.gridRow}
-        ItemSeparatorComponent={() => <View style={{ height: GRID_GAP }} />}
-        contentContainerStyle={[styles.gridContent, { paddingBottom: insets.bottom + 16 }]}
-        showsVerticalScrollIndicator={false}
-        ListEmptyComponent={<EmptyState />}
-      />
+      {loading ? (
+        <ActivityIndicator color={C.accent} style={{ marginTop: 40 }} />
+      ) : (
+        <FlatList
+          data={savedPosts}
+          keyExtractor={(item) => item.id}
+          renderItem={renderItem}
+          numColumns={GRID_COLS}
+          columnWrapperStyle={styles.gridRow}
+          ItemSeparatorComponent={() => <View style={{ height: GRID_GAP }} />}
+          contentContainerStyle={[styles.gridContent, { paddingBottom: insets.bottom + 16 }]}
+          showsVerticalScrollIndicator={false}
+          ListEmptyComponent={<EmptyState />}
+        />
+      )}
     </View>
   );
 }

@@ -91,7 +91,8 @@ function HUDStrip({ type, hud }: Props) {
 
   return (
     <LinearGradient
-      colors={['transparent', 'rgba(0,0,0,0.85)']}
+      colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.92)']}
+      locations={[0, 0.55]}
       style={styles.container}
     >
       <View style={styles.row}>
@@ -124,8 +125,8 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    paddingTop: 24,
-    paddingBottom: 14,
+    paddingTop: 32,
+    paddingBottom: 18,
     paddingHorizontal: 18,
   },
   row: {

@@ -8,9 +8,11 @@ import {
   Dimensions,
   SafeAreaView,
   Animated,
+  Alert,
 } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
+import { supabase } from '../supabaseClient';
 
 const { width, height } = Dimensions.get('window');
 
@@ -26,41 +28,26 @@ const VROOM_COLORS = {
 
 const FALLBACK_IMAGE = require('../assets/logo_vroom_Couleur.png');
 
-// --- Story Data Mock ---
 type StoryItem = {
   id: string;
   image: string;
-  duration?: number; // en ms, défaut 5000
-};
-
-const STORY_DATA: { [key: string]: StoryItem[] } = {
-  '1': [
-    { id: '1-1', image: 'https://images.unsplash.com/photo-1540261014352-7a064dc8cc94?w=500&h=800&fit=crop', duration: 5000 },
-    { id: '1-2', image: 'https://images.unsplash.com/photo-1568605114967-8130f3a36994?w=500&h=800&fit=crop', duration: 5000 },
-  ],
-  '2': [
-    { id: '2-1', image: 'https://images.unsplash.com/photo-1549399542-7e3f8b83ad5e?w=500&h=800&fit=crop', duration: 5000 },
-  ],
-  '3': [
-    { id: '3-1', image: 'https://images.unsplash.com/photo-1507950547674-7a86b984e2a1?w=500&h=800&fit=crop', duration: 5000 },
-    { id: '3-2', image: 'https://images.unsplash.com/photo-1552820728-8ac41f1ce891?w=500&h=800&fit=crop', duration: 5000 },
-  ],
-  '4': [
-    { id: '4-1', image: 'https://images.unsplash.com/photo-1514832098174-491d3f3fbf6f?w=500&h=800&fit=crop', duration: 5000 },
-  ],
+  duration?: number;
+  userId?: string;
 };
 
 type StoryViewerProps = {
   visible: boolean;
   highlightId: string;
   onClose: () => void;
-  stories?: StoryItem[]; // Dynamic stories passed from parent
+  stories?: StoryItem[];
+  currentUserId?: string;
+  onStoryDelete?: (storyId: string) => void;
 };
 
-export default function StoryViewer({ visible, highlightId, onClose, stories }: StoryViewerProps) {
+export default function StoryViewer({ visible, highlightId, onClose, stories, currentUserId, onStoryDelete }: StoryViewerProps) {
   const [currentStoryIndex, setCurrentStoryIndex] = useState(0);
   const [progressAnim] = useState(new Animated.Value(0));
-  const displayStories = stories || STORY_DATA[highlightId] || [];
+  const displayStories = stories || [];
   const currentStory = displayStories[currentStoryIndex];
 
   // Auto-advance story
@@ -147,6 +134,28 @@ export default function StoryViewer({ visible, highlightId, onClose, stories }: 
           <Ionicons name="close" size={28} color="#FFFFFF" />
         </Pressable>
 
+        {/* === DELETE BUTTON (own stories only) === */}
+        {currentStory?.userId && currentStory.userId === currentUserId && (
+          <Pressable
+            style={styles.deleteBtn}
+            hitSlop={12}
+            onPress={() => {
+              Alert.alert('Supprimer cette story ?', 'Elle disparaîtra définitivement.', [
+                { text: 'Annuler', style: 'cancel' },
+                {
+                  text: 'Supprimer', style: 'destructive',
+                  onPress: async () => {
+                    await supabase.from('stories').delete().eq('id', currentStory.id);
+                    onStoryDelete?.(currentStory.id);
+                  },
+                },
+              ]);
+            }}
+          >
+            <Ionicons name="trash-outline" size={22} color="#FFFFFF" />
+          </Pressable>
+        )}
+
         {/* === STORY IMAGE (FULLSCREEN) === */}
         <ExpoImage
           source={currentStory.image}
@@ -211,6 +220,16 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 16,
     right: 16,
+    zIndex: 100,
+    width: 44,
+    height: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  deleteBtn: {
+    position: 'absolute',
+    top: 16,
+    right: 60,
     zIndex: 100,
     width: 44,
     height: 44,

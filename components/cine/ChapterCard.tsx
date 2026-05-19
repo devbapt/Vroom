@@ -26,17 +26,18 @@ interface Props {
   index: number;
   location?: string;
   buildPhase?: string;
+  topOffset?: number;
 }
 
-function ChapterCard({ type, index, location, buildPhase }: Props) {
+function ChapterCard({ type, index, location, buildPhase, topOffset }: Props) {
   const chNum = String(index + 1).padStart(2, '0');
   const sessionLabel = getSessionLabel(type, buildPhase);
   const subtitle = location ? `${sessionLabel} · ${location.toUpperCase()}` : sessionLabel;
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, topOffset !== undefined && { top: topOffset }]}>
       <View style={styles.bar} />
-      <View>
+      <View style={styles.textBadge}>
         <Text style={styles.chLine}>{`CH. ${chNum}`}</Text>
         <Text style={styles.sessionLine} numberOfLines={1}>{subtitle}</Text>
       </View>
@@ -56,10 +57,16 @@ const styles = StyleSheet.create({
   },
   bar: {
     width: 3,
-    height: 22,
+    height: 28,
     borderRadius: 1.5,
     backgroundColor: C.accent,
     marginRight: 8,
+  },
+  textBadge: {
+    backgroundColor: 'rgba(0,0,0,0.48)',
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
   },
   chLine: {
     fontFamily: MONO,

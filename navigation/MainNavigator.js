@@ -3,7 +3,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 
 import HomeStackNavigator from './HomeStackNavigator';
 import MapScreen from '../screens/MapScreen';
-import SearchScreen from '../screens/SearchScreen';
+import SearchStackNavigator from './SearchStackNavigator';
 import MessagesScreen from '../screens/MessagesScreen';
 import ProfileStackNavigator from './ProfileStackNavigator';
 import CustomTabBar from '../components/ui/CustomTabBar';
@@ -18,7 +18,7 @@ export default function MainNavigator() {
     >
       <Tab.Screen name="Home"     component={HomeStackNavigator} />
       <Tab.Screen name="Maps"     component={MapScreen} />
-      <Tab.Screen name="Search"   component={SearchScreen} />
+      <Tab.Screen name="Search"   component={SearchStackNavigator} />
       <Tab.Screen name="Messages" component={MessagesScreen} />
       <Tab.Screen name="Profile"  component={ProfileStackNavigator} options={{ title: 'Profile' }} />
     </Tab.Navigator>

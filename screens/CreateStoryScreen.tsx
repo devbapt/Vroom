@@ -17,6 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useNavigation } from '@react-navigation/native';
 import { useAppContext } from '../context';
+import { supabase } from '../supabaseClient';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const PREVIEW_HEIGHT = Math.min(SCREEN_HEIGHT * 0.55, (SCREEN_WIDTH - 32) * 16 / 9);
@@ -42,9 +43,11 @@ export default function CreateStoryScreen() {
   const { user, addFeedStory, addHighlight, highlights } = useAppContext();
 
   const [imageUri, setImageUri] = useState('');
+  const [imageBase64, setImageBase64] = useState<string | null>(null);
   const [caption, setCaption] = useState('');
   const [addToHighlights, setAddToHighlights] = useState(false);
   const [selectedHighlightId, setSelectedHighlightId] = useState<string>('');
+  const [isPublishing, setIsPublishing] = useState(false);
 
   const pickImage = useCallback(async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -57,41 +60,83 @@ export default function CreateStoryScreen() {
       allowsEditing: true,
       aspect: [9, 16],
       quality: 0.85,
+      base64: true,
     });
     if (!result.canceled && result.assets[0]) {
-      setImageUri(result.assets[0].uri);
+      const asset = result.assets[0];
+      setImageUri(asset.uri);
+
+      let b64 = asset.base64 ?? null;
+      if (!b64 && asset.uri?.startsWith('data:')) {
+        const comma = asset.uri.indexOf(',');
+        b64 = comma >= 0 ? asset.uri.substring(comma + 1) : null;
+      }
+      if (b64 && b64.includes(';base64,')) {
+        b64 = b64.split(';base64,')[1] ?? b64;
+      }
+      setImageBase64(b64);
     }
   }, []);
 
-  const handlePublish = useCallback(() => {
-    if (!imageUri) {
-      Alert.alert('Photo requise', 'Sélectionne une photo pour publier ta story.');
+  const handlePublish = useCallback(async () => {
+    if (!imageUri || isPublishing) {
+      if (!imageUri) Alert.alert('Photo requise', 'Sélectionne une photo pour publier ta story.');
       return;
     }
+    if (!user?.id) return;
 
-    addFeedStory({
-      userId: user?.id ?? 'user_123',
-      username: user?.username ?? 'moi',
-      avatar: user?.avatar ?? '',
-      imageUrl: imageUri,
-    });
+    setIsPublishing(true);
+    try {
+      let publicUrl = imageUri;
 
-    if (addToHighlights) {
-      if (selectedHighlightId) {
-        // add to existing highlight (just increment count — Supabase will handle real data)
-      } else {
-        // create new highlight
+      if (imageBase64) {
+        const binaryStr = atob(imageBase64);
+        const bytes = new Uint8Array(binaryStr.length);
+        for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);
+
+        const filePath = `${user.id}/${Date.now()}.jpg`;
+        const { error: uploadError } = await supabase.storage
+          .from('stories')
+          .upload(filePath, bytes, { contentType: 'image/jpeg' });
+
+        if (uploadError) throw uploadError;
+
+        const { data: urlData } = supabase.storage.from('stories').getPublicUrl(filePath);
+        publicUrl = urlData.publicUrl;
+      }
+
+      const { error: insertError } = await supabase.from('stories').insert({
+        user_id: user.id,
+        image_url: publicUrl,
+        caption: caption.trim() || null,
+      });
+
+      if (insertError) throw insertError;
+
+      // Optimistic add to context
+      addFeedStory({
+        userId: user.id,
+        username: user.username ?? '',
+        avatar: user.avatar ?? '',
+        imageUrl: publicUrl,
+      });
+
+      if (addToHighlights && !selectedHighlightId) {
         addHighlight({
           id: Date.now().toString(),
           name: 'Story',
-          image: imageUri,
+          image: publicUrl,
           storyCount: 1,
         });
       }
-    }
 
-    navigation.goBack();
-  }, [imageUri, addFeedStory, addToHighlights, selectedHighlightId, addHighlight, user, navigation]);
+      navigation.goBack();
+    } catch (_) {
+      Alert.alert('Erreur', 'Impossible de publier la story.');
+    } finally {
+      setIsPublishing(false);
+    }
+  }, [imageUri, imageBase64, isPublishing, user, caption, addFeedStory, addToHighlights, selectedHighlightId, addHighlight, navigation]);
 
   return (
     <KeyboardAvoidingView
@@ -107,13 +152,13 @@ export default function CreateStoryScreen() {
         <Pressable
           style={({ pressed }) => [
             styles.publishBtn,
-            !imageUri && styles.publishBtnDisabled,
+            (!imageUri || isPublishing) && styles.publishBtnDisabled,
             pressed && { opacity: 0.8 },
           ]}
           onPress={handlePublish}
-          disabled={!imageUri}
+          disabled={!imageUri || isPublishing}
         >
-          <Text style={styles.publishBtnText}>PUBLIER</Text>
+          <Text style={styles.publishBtnText}>{isPublishing ? '…' : 'PUBLIER'}</Text>
         </Pressable>
       </View>
 

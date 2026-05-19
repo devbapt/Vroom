@@ -85,11 +85,6 @@ function ActionStack({ postId, likes, isLiked, comments, isSaved, onLike, onSave
         }
         label=""
       />
-      <ActionBtn
-        icon={<Feather name="volume-x" size={18} color={C.white} />}
-        label=""
-        subLabel="MUTED"
-      />
     </View>
   );
 }
