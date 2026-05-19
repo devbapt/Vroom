@@ -68,7 +68,7 @@ interface GarageCar {
 export default function ProfileScreen() {
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
-  const { language, user, updateProfileAvatar } = useAppContext();
+  const { language, user, updateProfileAvatar, markPostDeleted } = useAppContext();
   const t = getTranslation(language);
 
   const [selectedCarId, setSelectedCarId] = useState<string | null>(null);
@@ -275,22 +275,11 @@ export default function ProfileScreen() {
     } catch (_) {}
   };
 
-  const handleDeletePost = useCallback((postId: string) => {
-    const doDelete = async () => {
-      await supabase.from('posts').delete().eq('id', postId);
-      setMyPublications(prev => prev.filter((p: any) => p.id !== postId));
-    };
-    if (Platform.OS === 'web') {
-      if ((window as any).confirm('Supprimer ce post ? Cette action est irréversible.')) {
-        doDelete();
-      }
-    } else {
-      Alert.alert('Supprimer ce post ?', 'Cette action est irréversible.', [
-        { text: 'Annuler', style: 'cancel' },
-        { text: 'Supprimer', style: 'destructive', onPress: doDelete },
-      ]);
-    }
-  }, []);
+  const handleDeletePost = useCallback(async (postId: string) => {
+    await supabase.from('posts').delete().eq('id', postId);
+    setMyPublications(prev => prev.filter((p: any) => p.id !== postId));
+    markPostDeleted(postId);
+  }, [markPostDeleted]);
 
   const handleDeleteHighlight = (id: string) => {
     Alert.alert(t.profile.delete_highlight, t.profile.delete_confirm, [
@@ -469,6 +458,7 @@ function ProfileGridView({
   const bio = user?.bio ?? '';
   const avatarUri = user?.avatar || null;
   const followersCount = user?.followersCount ?? 0;
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
   const formatCount = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n));
 
@@ -662,7 +652,7 @@ function ProfileGridView({
               <View style={styles.emptyTab} />
             ) : (
               posts.map((post: any) => (
-                <View key={post.id} style={styles.pubItem}>
+                <Pressable key={post.id} style={styles.pubItem} onPress={() => setPendingDeleteId(null)}>
                   <ExpoImage
                     source={post.image_urls?.[0] ?? post.photos?.[0] ?? post.image}
                     style={StyleSheet.absoluteFillObject}
@@ -675,14 +665,25 @@ function ProfileGridView({
                       <Ionicons name={(POST_TYPE_ICON[post.type] ?? 'ellipse') as any} size={10} color="#FFF" />
                     </View>
                   )}
-                  <Pressable
-                    style={styles.pubMenuBtn}
-                    onPress={() => onDeletePost(post.id)}
-                    hitSlop={6}
-                  >
-                    <Text style={styles.pubMenuText}>···</Text>
-                  </Pressable>
-                </View>
+                  {pendingDeleteId === post.id ? (
+                    <TouchableOpacity
+                      style={styles.pubDeleteConfirmBtn}
+                      onPress={() => { onDeletePost(post.id); setPendingDeleteId(null); }}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={styles.pubDeleteConfirmText}>Supprimer</Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <TouchableOpacity
+                      style={styles.pubMenuBtn}
+                      onPress={() => setPendingDeleteId(post.id)}
+                      hitSlop={6}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles.pubMenuText}>···</Text>
+                    </TouchableOpacity>
+                  )}
+                </Pressable>
               ))
             )}
           </View>
@@ -921,7 +922,7 @@ const styles = StyleSheet.create({
 
   // Publications + Garage unified grid
   pubGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: PUB_GAP, paddingTop: 2 },
-  pubItem: { width: PUB_SIZE, height: PUB_SIZE, backgroundColor: C.fieldBg },
+  pubItem: { width: PUB_SIZE, height: PUB_SIZE, backgroundColor: C.fieldBg, position: 'relative', overflow: 'hidden' },
   pubItemGradient: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'transparent',
@@ -937,11 +938,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center', alignItems: 'center',
   },
   pubMenuBtn: {
-    position: 'absolute', top: 4, right: 4,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    borderRadius: 4, paddingHorizontal: 5, paddingVertical: 1,
+    position: 'absolute', top: 4, right: 4, zIndex: 10,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    borderRadius: 4, paddingHorizontal: 6, paddingVertical: 3,
   },
   pubMenuText: { fontSize: 11, color: '#FFF', fontWeight: '700', letterSpacing: 1 },
+  pubDeleteConfirmBtn: {
+    position: 'absolute', top: 4, right: 4, zIndex: 10,
+    backgroundColor: '#D91D2F',
+    borderRadius: 4, paddingHorizontal: 6, paddingVertical: 3,
+  },
+  pubDeleteConfirmText: { fontSize: 10, color: '#FFF', fontWeight: '700' },
 
   emptyTab: { alignItems: 'center', paddingVertical: 60, gap: 12 },
   emptyTabText: { color: C.muted, fontSize: 12 },

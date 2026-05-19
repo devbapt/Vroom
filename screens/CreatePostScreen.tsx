@@ -39,8 +39,6 @@ const C = {
   inputBg: 'rgba(255,255,255,0.07)',
 };
 
-const MONO = 'Courier';
-
 // ─── Post type definitions ────────────────────────────────────────────────────
 
 type PostTypeConfig = {
@@ -64,9 +62,10 @@ type HUDFieldDef = { key: string; label: string; placeholder: string; keyboardTy
 
 const HUD_FIELDS: Record<CineDrivePostType, HUDFieldDef[]> = {
   track: [
-    { key: 'power',        label: 'POWER (hp)',  placeholder: '525hp' },
-    { key: 'acceleration', label: '0–100 (s)',   placeholder: '3.2s' },
-    { key: 'lapTime',      label: 'LAP TIME',    placeholder: '1:58.4' },
+    { key: 'power',        label: 'POWER (hp)',     placeholder: '525hp' },
+    { key: 'acceleration', label: '0–100 (s)',      placeholder: '3.2s' },
+    { key: 'lapTime',      label: 'LAP TIME',       placeholder: '1:58.4' },
+    { key: 'avgSpeed',     label: 'VIT. MOY. (km/h)', placeholder: '142 km/h' },
   ],
   road_trip: [
     { key: 'distance', label: 'DISTANCE',  placeholder: '142km' },
@@ -99,7 +98,7 @@ const HUD_FIELDS: Record<CineDrivePostType, HUDFieldDef[]> = {
 function buildHUD(type: CineDrivePostType, hudValues: Record<string, string>, rarity: 1|2|3|4|5): AnyHUD {
   switch (type) {
     case 'track':
-      return { kind: 'track', power: hudValues.power || '—', acceleration: hudValues.acceleration || '—', lapTime: hudValues.lapTime || '—' };
+      return { kind: 'track', power: hudValues.power || '—', acceleration: hudValues.acceleration || '—', lapTime: hudValues.lapTime || '—', avgSpeed: hudValues.avgSpeed || '—' };
     case 'road_trip':
       return { kind: 'road_trip', distance: hudValues.distance || '—', duration: hudValues.duration || '—', crew: hudValues.crew || '—' };
     case 'meet':
@@ -496,7 +495,7 @@ const styles = StyleSheet.create({
     borderBottomColor: C.border,
   },
   headerTitle: {
-    fontFamily: MONO,
+
     fontSize: 13,
     letterSpacing: 2,
     color: C.white,
@@ -509,7 +508,7 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
   },
   publishBtnText: {
-    fontFamily: MONO,
+
     fontSize: 11,
     letterSpacing: 1.5,
     color: C.white,
@@ -536,7 +535,7 @@ const styles = StyleSheet.create({
     backgroundColor: C.accent,
   },
   sectionTitleText: {
-    fontFamily: MONO,
+
     fontSize: 9,
     letterSpacing: 2,
     color: C.whiteSoft,
@@ -574,7 +573,7 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
   },
   mainBadgeText: {
-    fontFamily: MONO,
+
     fontSize: 7,
     letterSpacing: 1,
     color: C.white,
@@ -592,7 +591,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   addPhotoText: {
-    fontFamily: MONO,
+
     fontSize: 9,
     letterSpacing: 0.5,
     color: C.whiteSoft,
@@ -620,7 +619,7 @@ const styles = StyleSheet.create({
     backgroundColor: C.surfaceActive,
   },
   typeChipText: {
-    fontFamily: MONO,
+
     fontSize: 10,
     letterSpacing: 1.5,
     color: C.whiteSoft,
@@ -641,7 +640,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   fieldLabel: {
-    fontFamily: MONO,
+
     fontSize: 8,
     letterSpacing: 1.5,
     color: C.whiteSoft,
@@ -683,7 +682,7 @@ const styles = StyleSheet.create({
 
   // Char count
   charCount: {
-    fontFamily: MONO,
+
     fontSize: 9,
     color: C.whiteFaint,
     textAlign: 'right',

@@ -13,8 +13,6 @@ const C = {
 };
 
 const AVATAR_SIZE = 42;
-const MONO = 'Courier';
-
 interface UserItemProps {
   user: LiveUser;
 }
@@ -94,7 +92,7 @@ const styles = StyleSheet.create({
   label: {
     marginTop: 4,
     fontSize: 9,
-    fontFamily: MONO,
+
   },
   labelLive: {
     color: C.accent,

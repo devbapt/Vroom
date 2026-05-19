@@ -24,8 +24,6 @@ const C = {
   ringSeen: 'rgba(255,255,255,0.25)',
 };
 
-const MONO = 'Courier';
-
 // ─── Story Avatar Item ────────────────────────────────────────────────────────
 
 interface StoryItemProps {
@@ -135,7 +133,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   storyLabel: {
-    fontFamily: MONO,
+
     fontSize: 9,
     letterSpacing: 0.5,
     color: C.whiteSoft,

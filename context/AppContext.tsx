@@ -6,7 +6,7 @@ import { supabase } from '../supabaseClient';
 
 export type CineDrivePostType = 'track' | 'road_trip' | 'meet' | 'daily' | 'build' | 'spotted';
 
-export interface TrackHUD     { kind: 'track';     power: string; acceleration: string; lapTime: string; }
+export interface TrackHUD     { kind: 'track';     power: string; acceleration: string; lapTime: string; avgSpeed: string; }
 export interface RoadTripHUD  { kind: 'road_trip'; distance: string; duration: string; crew: string; }
 export interface MeetHUD      { kind: 'meet';      city: string; people: string; cars: string; }
 export interface DailyHUD     { kind: 'daily';     power: string; acceleration: string; transmission: string; }
@@ -160,6 +160,8 @@ export interface AppContextType {
   toggleLikeCinePost: (postId: string) => void;
   toggleSaveCinePost: (postId: string) => void;
   addCinePost: (post: CineDrivePost) => void;
+  deletedPostIds: string[];
+  markPostDeleted: (postId: string) => void;
 
   // Feed Stories
   feedStories: FeedStory[];
@@ -191,6 +193,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [language, setLanguageState] = useState<Language>('fr');
   const [cinePosts, setCinePosts] = useState<CineDrivePost[]>([]);
   const [liveUsers] = useState<LiveUser[]>([]);
+  const [deletedPostIds, setDeletedPostIds] = useState<string[]>([]);
   const [feedStories, setFeedStories] = useState<FeedStory[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [showWelcome, setShowWelcome] = useState(false);
@@ -287,6 +290,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   const addCinePost = useCallback((post: CineDrivePost) => {
     setCinePosts(prev => [post, ...prev]);
+  }, []);
+
+  const markPostDeleted = useCallback((postId: string) => {
+    setDeletedPostIds(prev => [...prev, postId]);
   }, []);
 
   // Feed Stories
@@ -418,6 +425,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     toggleLikeCinePost,
     toggleSaveCinePost,
     addCinePost,
+    deletedPostIds,
+    markPostDeleted,
     feedStories: activeStories,
     markStoryAsViewed,
     addFeedStory,

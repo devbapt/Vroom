@@ -56,7 +56,7 @@ function mapRowToPost(row: any, savedIds: Set<string>, likedIds: Set<string>): C
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
-  const { feedStories, markStoryAsViewed, removeFeedStory, user, toggleSaveCinePost } = useAppContext();
+  const { feedStories, markStoryAsViewed, removeFeedStory, user, toggleSaveCinePost, deletedPostIds } = useAppContext();
 
   const [posts, setPosts] = useState<CineDrivePostData[]>([]);
   const [storyViewerVisible, setStoryViewerVisible] = useState(false);
@@ -130,6 +130,11 @@ export default function HomeScreen() {
     fetchPosts();
     return () => { cancelled = true; };
   }, [user?.id]);
+
+  useEffect(() => {
+    if (deletedPostIds.length === 0) return;
+    setPosts(prev => prev.filter(p => !deletedPostIds.includes(p.id)));
+  }, [deletedPostIds]);
 
   // ── Callbacks ─────────────────────────────────────────────────────────────
 

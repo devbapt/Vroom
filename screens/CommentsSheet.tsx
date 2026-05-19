@@ -105,9 +105,9 @@ function CommentRow({ comment, isReply, currentUserId, onLike, onSave, onDelete,
             size={14}
             color={comment.isLiked ? C.accent : C.whiteSoft}
           />
-          {comment.likes_count > 0 && (
-            <Text style={styles.likeCommentCount}>{comment.likes_count}</Text>
-          )}
+          <Text style={[styles.likeCommentCount, comment.likes_count === 0 && styles.likeCommentCountZero]}>
+            {comment.likes_count}
+          </Text>
         </Pressable>
         <Pressable onPress={() => onSave(comment.id)} hitSlop={8} style={styles.saveComment}>
           <Ionicons
@@ -483,9 +483,13 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   likeCommentCount: {
-    fontFamily: MONO,
     fontSize: 9,
     color: C.whiteFaint,
+    minWidth: 12,
+    textAlign: 'center',
+  },
+  likeCommentCountZero: {
+    opacity: 0.35,
   },
   saveComment: {
     paddingTop: 2,

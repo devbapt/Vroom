@@ -216,17 +216,25 @@ export default function UserProfileScreen() {
 
         {/* ── Action buttons ── */}
         <View style={styles.actionRow}>
-          <TouchableOpacity
-            style={[styles.actionBtn, { flex: 1 }, isFollowing && styles.actionBtnActive, !canFollow && styles.actionBtnDisabled]}
-            onPress={handleToggleFollow}
-            disabled={!canFollow}
-          >
-            <Text style={[styles.actionBtnText, isFollowing && styles.actionBtnTextActive]}>
-              {isFollowing ? 'Abonné' : 'Suivre'}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.actionBtn, { flex: 1 }]} onPress={handleShare}>
-            <Text style={styles.actionBtnText}>Partager</Text>
+          {canFollow ? (
+            <TouchableOpacity
+              style={[styles.followBtn, isFollowing && styles.followBtnFollowing]}
+              onPress={handleToggleFollow}
+            >
+              <Text style={[styles.followBtnText, isFollowing && styles.followBtnTextFollowing]}>
+                {isFollowing ? 'Abonné' : "S'abonner"}
+              </Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              style={styles.editBtn}
+              onPress={() => navigation.navigate('EditProfile' as any)}
+            >
+              <Text style={styles.editBtnText}>Modifier le profil</Text>
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity style={styles.shareBtn} onPress={handleShare}>
+            <Ionicons name="share-outline" size={16} color={C.dark} />
           </TouchableOpacity>
         </View>
 
@@ -388,20 +396,41 @@ const styles = StyleSheet.create({
   bioName: { fontSize: 13, fontWeight: '700', color: C.dark, marginBottom: 2 },
   bioText: { fontSize: 11, color: C.dark, lineHeight: 16 },
 
-  actionRow: { flexDirection: 'row', paddingHorizontal: PAD, paddingBottom: 14, gap: 8 },
-  actionBtn: {
-    height: 30,
-    borderRadius: 8,
-    borderWidth: 1,
+  actionRow: { flexDirection: 'row', paddingHorizontal: PAD, paddingBottom: 14, gap: 8, alignItems: 'center' },
+  followBtn: {
+    flex: 1,
+    height: 38,
+    borderRadius: 10,
+    backgroundColor: C.accent,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  followBtnFollowing: {
+    backgroundColor: 'transparent',
+    borderWidth: 1.5,
+    borderColor: '#CCCCCC',
+  },
+  followBtnText: { fontSize: 14, fontWeight: '700', color: '#FFFFFF' },
+  followBtnTextFollowing: { color: C.dark },
+  editBtn: {
+    flex: 1,
+    height: 38,
+    borderRadius: 10,
+    borderWidth: 1.5,
     borderColor: '#CCCCCC',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 8,
   },
-  actionBtnActive: { backgroundColor: C.accent, borderColor: C.accent },
-  actionBtnDisabled: { opacity: 0.35 },
-  actionBtnText: { fontSize: 11, fontWeight: '600', color: C.dark },
-  actionBtnTextActive: { color: '#FFFFFF' },
+  editBtnText: { fontSize: 13, fontWeight: '600', color: C.dark },
+  shareBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: '#CCCCCC',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
 
   activityRow: { flexDirection: 'row', paddingHorizontal: PAD, gap: 6, marginBottom: 20 },
   activityCard: { flex: 1, borderRadius: 12, padding: 10, minHeight: 76, justifyContent: 'flex-end' },

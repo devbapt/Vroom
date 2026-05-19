@@ -19,7 +19,6 @@ const C = {
   divider: 'rgba(255,255,255,0.15)',
 };
 
-const MONO = 'Courier';
 
 interface HUDColumn {
   label: string;
@@ -27,14 +26,15 @@ interface HUDColumn {
   isAccent?: boolean;
 }
 
-function getColumns(type: CineDrivePostType, hud: AnyHUD): [HUDColumn, HUDColumn, HUDColumn] {
+function getColumns(type: CineDrivePostType, hud: AnyHUD): HUDColumn[] {
   switch (type) {
     case 'track': {
       const d = hud as TrackHUD;
       return [
-        { label: 'POWER',  value: d.power },
-        { label: '0–100',  value: d.acceleration },
-        { label: 'LAP',    value: d.lapTime, isAccent: true },
+        { label: 'POWER',    value: d.power },
+        { label: '0–100',    value: d.acceleration },
+        { label: 'VIT. MOY', value: d.avgSpeed ?? '—' },
+        { label: 'LAP',      value: d.lapTime, isAccent: true },
       ];
     }
     case 'road_trip': {
@@ -87,7 +87,7 @@ interface Props {
 }
 
 function HUDStrip({ type, hud }: Props) {
-  const [col1, col2, col3] = getColumns(type, hud);
+  const cols = getColumns(type, hud);
 
   return (
     <LinearGradient
@@ -96,11 +96,12 @@ function HUDStrip({ type, hud }: Props) {
       style={styles.container}
     >
       <View style={styles.row}>
-        <HUDCol col={col1} />
-        <View style={styles.divider} />
-        <HUDCol col={col2} />
-        <View style={styles.divider} />
-        <HUDCol col={col3} />
+        {cols.map((col, i) => (
+          <View key={col.label} style={styles.rowItem}>
+            {i > 0 && <View style={styles.divider} />}
+            <HUDCol col={col} />
+          </View>
+        ))}
       </View>
     </LinearGradient>
   );
@@ -133,19 +134,24 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
+  rowItem: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   col: {
     flex: 1,
     alignItems: 'center',
   },
   colLabel: {
-    fontFamily: MONO,
+
     fontSize: 8,
     letterSpacing: 1.5,
     color: C.whiteFaint,
     marginBottom: 4,
   },
   colValue: {
-    fontFamily: MONO,
+
     fontSize: 18,
     fontWeight: '500',
     color: C.white,

@@ -6,9 +6,11 @@ import {
   ScrollView,
   Dimensions,
   Pressable,
+  Animated,
   NativeSyntheticEvent,
   NativeScrollEvent,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { Image as ExpoImage } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import ChapterCard from './ChapterCard';
@@ -27,7 +29,6 @@ const C = {
   pageInactive: 'rgba(255,255,255,0.25)',
 };
 
-const MONO = 'Courier';
 
 // ─── Page Indicator ──────────────────────────────────────────────────────────
 
@@ -104,6 +105,28 @@ interface Props {
 function CineDrivePost({ post, index, postHeight, chapterTopOffset, onLike, onSave, onComment, onUserPress }: Props) {
   const [activePhotoIndex, setActivePhotoIndex] = useState(0);
 
+  // Double-tap to like
+  const lastTapRef = useRef<number>(0);
+  const heartAnim = useRef(new Animated.Value(0)).current;
+
+  const showHeartAnim = useCallback(() => {
+    heartAnim.setValue(0);
+    Animated.sequence([
+      Animated.spring(heartAnim, { toValue: 1, useNativeDriver: true, speed: 20, bounciness: 12 }),
+      Animated.delay(500),
+      Animated.timing(heartAnim, { toValue: 0, duration: 300, useNativeDriver: true }),
+    ]).start();
+  }, [heartAnim]);
+
+  const handleTap = useCallback(() => {
+    const now = Date.now();
+    if (now - lastTapRef.current < 320) {
+      if (!post.isLiked) onLike(post.id);
+      showHeartAnim();
+    }
+    lastTapRef.current = now;
+  }, [post.id, post.isLiked, onLike, showHeartAnim]);
+
   const photos = post.photos && post.photos.length > 0 ? post.photos : [post.image];
   const hasMultiplePhotos = photos.length > 1;
 
@@ -131,16 +154,31 @@ function CineDrivePost({ post, index, postHeight, chapterTopOffset, onLike, onSa
         scrollEnabled={hasMultiplePhotos}
       >
         {photos.map((photo, i) => (
-          <ExpoImage
-            key={i}
-            source={photo}
-            style={{ width: SCREEN_WIDTH, height: postHeight }}
-            contentFit="cover"
-            cachePolicy="memory-disk"
-            transition={i === 0 ? 200 : 0}
-          />
+          <Pressable key={i} onPress={handleTap} style={{ width: SCREEN_WIDTH, height: postHeight }}>
+            <ExpoImage
+              source={photo}
+              style={StyleSheet.absoluteFill}
+              contentFit="cover"
+              cachePolicy="memory-disk"
+              transition={i === 0 ? 200 : 0}
+            />
+          </Pressable>
         ))}
       </ScrollView>
+
+      {/* Animation cœur double-tap */}
+      <Animated.View
+        pointerEvents="none"
+        style={[
+          styles.heartOverlay,
+          {
+            opacity: heartAnim,
+            transform: [{ scale: heartAnim.interpolate({ inputRange: [0, 1], outputRange: [0.5, 1] }) }],
+          },
+        ]}
+      >
+        <Ionicons name="heart" size={90} color={C.accent} />
+      </Animated.View>
 
       {/* Readability gradient overlay */}
       <LinearGradient
@@ -193,6 +231,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#140102',
     overflow: 'hidden',
   },
+  heartOverlay: {
+    position: 'absolute',
+    top: 0, left: 0, right: 0, bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
 
   // Page Indicator — horizontal dots centered at top
   pageIndicator: {
@@ -244,7 +288,7 @@ const styles = StyleSheet.create({
     color: C.white,
   },
   authorVehicle: {
-    fontFamily: MONO,
+
     fontSize: 10,
     letterSpacing: 0.3,
     color: C.whiteSoft,

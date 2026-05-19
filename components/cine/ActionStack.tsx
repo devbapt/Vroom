@@ -10,8 +10,6 @@ const C = {
   btnBorder: 'rgba(255,255,255,0.15)',
 };
 
-const MONO = 'Courier';
-
 function formatCount(n: number): string {
   if (n >= 1000) return (n / 1000).toFixed(1) + 'k';
   return String(n);
@@ -113,13 +111,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   counter: {
-    fontFamily: MONO,
+
     fontSize: 9,
     color: C.white,
     marginTop: 3,
   },
   subLabel: {
-    fontFamily: MONO,
+
     fontSize: 8,
     color: C.whiteFaint,
     marginTop: 1,

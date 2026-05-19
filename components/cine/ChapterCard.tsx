@@ -8,7 +8,6 @@ const C = {
   whiteFaint: 'rgba(255,255,255,0.25)',
 };
 
-const MONO = 'Courier';
 
 function getSessionLabel(type: CineDrivePostType, buildPhase?: string): string {
   switch (type) {
@@ -68,13 +67,13 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
   },
   chLine: {
-    fontFamily: MONO,
+
     fontSize: 5,
     letterSpacing: 1.5,
     color: C.whiteFaint,
   },
   sessionLine: {
-    fontFamily: MONO,
+
     fontSize: 11,
     letterSpacing: 1.5,
     color: C.white,
