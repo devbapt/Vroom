@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -18,6 +18,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useNavigation } from '@react-navigation/native';
 import { useAppContext } from '../context';
+import { getTranslation } from '../i18n';
 import { supabase } from '../supabaseClient';
 import type {
   VehicleTransmission,
@@ -68,12 +69,7 @@ const DRIVETRAIN_OPTIONS: ChipOption<VehicleDrivetrain>[] = [
   { value: '4WD', label: '4WD' },
 ];
 
-const FUEL_OPTIONS: ChipOption<VehicleFuel>[] = [
-  { value: 'gasoline', label: 'Essence' },
-  { value: 'diesel',   label: 'Diesel' },
-  { value: 'hybrid',   label: 'Hybride' },
-  { value: 'electric', label: 'Électrique' },
-];
+// Fuel labels are built dynamically from translations (see component)
 
 const STATUS_OPTIONS: ChipOption<VehicleStatus>[] = [
   { value: 'daily',   label: 'Daily' },
@@ -208,7 +204,15 @@ function BrandInput({
 export default function AddVehicleScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
-  const { user } = useAppContext();
+  const { user, language } = useAppContext();
+  const t = getTranslation(language).garage;
+
+  const FUEL_OPTIONS: ChipOption<VehicleFuel>[] = [
+    { value: 'gasoline', label: t.fuel_gasoline },
+    { value: 'diesel',   label: t.fuel_diesel },
+    { value: 'hybrid',   label: t.fuel_hybrid },
+    { value: 'electric', label: t.fuel_electric },
+  ];
 
   // Identity
   const [imageUri, setImageUri] = useState('');
@@ -240,11 +244,11 @@ export default function AddVehicleScreen() {
   const pickImage = useCallback(async () => {
     const { status: perm } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (perm !== 'granted') {
-      Alert.alert('Permission requise', 'Accès à la galerie nécessaire.');
+      Alert.alert(t.permissionRequired, t.permissionMsg);
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ['images'],
       allowsEditing: true,
       aspect: [16, 9],
       quality: 0.85,
@@ -312,8 +316,8 @@ export default function AddVehicleScreen() {
 
       navigation.goBack();
     } catch (err: any) {
-      const msg = err?.message ?? JSON.stringify(err) ?? 'Erreur inconnue';
-      Alert.alert('Erreur', msg);
+      const msg = err?.message ?? t.errorMsg;
+      Alert.alert(t.errorMsg, msg);
     } finally {
       setIsSubmitting(false);
     }
@@ -329,7 +333,7 @@ export default function AddVehicleScreen() {
         <Pressable onPress={() => navigation.goBack()} hitSlop={12}>
           <Ionicons name="arrow-back" size={24} color={C.white} />
         </Pressable>
-        <Text style={styles.headerTitle}>AJOUTER AU GARAGE</Text>
+        <Text style={styles.headerTitle}>{t.addTitle}</Text>
         <View style={{ width: 24 }} />
       </View>
 
@@ -339,85 +343,83 @@ export default function AddVehicleScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* ── Photo ── */}
-        <SectionTitle label="PHOTO PRINCIPALE *" />
+        <SectionTitle label={t.mainPhoto} />
 
         <Pressable style={styles.photoArea} onPress={pickImage}>
           {imageUri ? (
             <>
-              <ExpoImage
-                source={imageUri}
-                style={styles.photoPreview}
-                contentFit="cover"
-              />
+              <ExpoImage source={imageUri} style={styles.photoPreview} contentFit="cover" />
               <View style={styles.replaceOverlay}>
                 <Ionicons name="camera-outline" size={20} color={C.white} />
-                <Text style={styles.replaceText}>Remplacer</Text>
+                <Text style={styles.replaceText}>{t.replace}</Text>
               </View>
             </>
           ) : (
             <View style={styles.photoPlaceholder}>
               <Ionicons name="camera-outline" size={36} color={C.whiteFaint} />
-              <Text style={styles.photoPlaceholderText}>Ajouter une photo</Text>
-              <Text style={styles.photoPlaceholderHint}>Format 16:9 recommandé</Text>
+              <Text style={styles.photoPlaceholderText}>{t.addPhoto}</Text>
+              <Text style={styles.photoPlaceholderHint}>{t.photoFormat}</Text>
             </View>
           )}
         </Pressable>
 
         {/* ── Identité ── */}
-        <SectionTitle label="IDENTITÉ" />
+        <SectionTitle label={t.identity} />
 
         <BrandInput value={brand} onChangeText={setBrand} />
 
         <View style={styles.row}>
           <View style={{ flex: 3 }}>
-            <Field label="MODÈLE *" value={model} onChangeText={setModel} placeholder="911 GT3 RS" />
+            <Field label={t.model} value={model} onChangeText={setModel} placeholder="911 GT3 RS" />
           </View>
           <View style={{ flex: 1 }}>
-            <Field label="ANNÉE *" value={year} onChangeText={setYear} placeholder="2024" keyboardType="numeric" />
+            <Field label={t.year} value={year} onChangeText={setYear} placeholder="2024" keyboardType="numeric" />
           </View>
         </View>
 
-        <Field label="SURNOM (optionnel)" value={nickname} onChangeText={setNickname} placeholder="La rouge, Ma daily…" />
+        <Field label={t.nickname} value={nickname} onChangeText={setNickname} placeholder="La rouge, Ma daily…" />
 
         {/* ── Techniques ── */}
-        <SectionTitle label="CARACTÉRISTIQUES TECHNIQUES" />
+        <SectionTitle label={t.technical} />
 
         <View style={styles.row}>
           <View style={{ flex: 1 }}>
-            <Field label="POWER" value={power} onChangeText={setPower} placeholder="525hp" mono />
+            <Field label={t.power} value={power} onChangeText={setPower} placeholder="525hp" mono />
           </View>
           <View style={{ flex: 1 }}>
-            <Field label="0–100 (s)" value={acceleration} onChangeText={setAcceleration} placeholder="3.2s" mono />
+            <Field label={t.acceleration} value={acceleration} onChangeText={setAcceleration} placeholder="3.2s" mono />
           </View>
         </View>
 
-        <ChipSelector label="TRANSMISSION" options={TRANSMISSION_OPTIONS} value={transmission} onChange={setTransmission} />
-        <ChipSelector label="TRANSMISSION DE PUISSANCE" options={DRIVETRAIN_OPTIONS} value={drivetrain} onChange={setDrivetrain} />
-        <ChipSelector label="CARBURANT" options={FUEL_OPTIONS} value={fuel} onChange={setFuel} />
+        <ChipSelector label={t.transmission} options={TRANSMISSION_OPTIONS} value={transmission} onChange={setTransmission} />
+        <ChipSelector label={t.drivetrain}    options={DRIVETRAIN_OPTIONS}   value={drivetrain}   onChange={setDrivetrain} />
+        <ChipSelector label={t.fuel}          options={FUEL_OPTIONS}         value={fuel}         onChange={setFuel} />
 
         {/* ── Détails ── */}
-        <SectionTitle label="DÉTAILS OPTIONNELS" />
+        <SectionTitle label={t.details} />
 
         <View style={styles.row}>
           <View style={{ flex: 1 }}>
-            <Field label="COULEUR" value={color} onChangeText={setColor} placeholder="Argent" />
+            <Field label={t.color}   value={color}   onChangeText={setColor}   placeholder="Argent" />
           </View>
           <View style={{ flex: 1 }}>
-            <Field label="KILOMÉTRAGE" value={mileage} onChangeText={setMileage} placeholder="24 800" keyboardType="numeric" mono />
+            <Field label={t.mileage} value={mileage} onChangeText={setMileage} placeholder="24 800" keyboardType="numeric" mono />
           </View>
         </View>
 
-        <Field label="DATE D'ACQUISITION" value={acquiredAt} onChangeText={setAcquiredAt} placeholder="MM/AAAA" />
+        <Field label={t.acquiredAt} value={acquiredAt} onChangeText={setAcquiredAt} placeholder="MM/YYYY" />
 
-        <ChipSelector label="STATUT" options={STATUS_OPTIONS} value={status} onChange={setStatus} />
+        <ChipSelector label={t.status} options={STATUS_OPTIONS} value={status} onChange={setStatus} />
 
         {/* ── Notes ── */}
-        <SectionTitle label="NOTES" />
+        <SectionTitle label={t.notes} />
         <Field
-          label="HISTORIQUE / ANECDOTES"
+          label={t.history}
           value={notes}
           onChangeText={(v) => v.length <= 500 && setNotes(v)}
-          placeholder="Restauration complète en 2023, acquis lors d'une enchère à Monaco…"
+          placeholder={language === 'fr'
+            ? 'Restauration complète en 2023, acquis lors d\'une enchère à Monaco…'
+            : 'Full restoration in 2023, acquired at a Monaco auction…'}
           multiline
         />
         <Text style={styles.charCount}>{notes.length}/500</Text>
@@ -433,15 +435,13 @@ export default function AddVehicleScreen() {
           ) : (
             <>
               <Ionicons name="car-sport-outline" size={18} color={C.white} />
-              <Text style={styles.submitBtnText}>AJOUTER AU GARAGE</Text>
+              <Text style={styles.submitBtnText}>{t.add}</Text>
             </>
           )}
         </Pressable>
 
         {!isValid && !isSubmitting && (
-          <Text style={styles.validationHint}>
-            Photo, marque, modèle et année requis
-          </Text>
+          <Text style={styles.validationHint}>{t.requiredHint}</Text>
         )}
       </ScrollView>
     </KeyboardAvoidingView>
