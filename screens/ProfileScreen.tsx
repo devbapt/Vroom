@@ -331,7 +331,10 @@ export default function ProfileScreen() {
 
       {/* Menu overlay */}
       {menuVisible && <Pressable style={styles.overlay} onPress={closeMenu} />}
-      <Animated.View style={[styles.bottomSheet, { transform: [{ translateY: slideAnim }] }]}>
+      <Animated.View
+        style={[styles.bottomSheet, { transform: [{ translateY: slideAnim }] }]}
+        pointerEvents={menuVisible ? 'box-none' : 'none'}
+      >
         <View style={[styles.sheetInner, { paddingBottom: insets.bottom + 12 }]}>
           <View style={styles.dragHandle} />
           <Pressable style={({ pressed }) => [styles.sheetItem, pressed && { backgroundColor: C.fieldBg }]}
@@ -360,7 +363,10 @@ export default function ProfileScreen() {
 
       {/* Add content overlay */}
       {addSheetVisible && <Pressable style={styles.overlay} onPress={closeAddSheet} />}
-      <Animated.View style={[styles.bottomSheet, { transform: [{ translateY: addSlideAnim }] }]}>
+      <Animated.View
+        style={[styles.bottomSheet, { transform: [{ translateY: addSlideAnim }] }]}
+        pointerEvents={addSheetVisible ? 'box-none' : 'none'}
+      >
         <View style={[styles.sheetInner, { paddingBottom: insets.bottom + 12 }]}>
           <View style={styles.dragHandle} />
           <Text style={styles.sheetTitle}>Ajouter du contenu</Text>

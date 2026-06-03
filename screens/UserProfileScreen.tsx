@@ -128,18 +128,25 @@ export default function UserProfileScreen() {
   const handleToggleFollow = useCallback(async () => {
     if (!user?.id) return;
     if (isFollowing) {
+      setIsFollowing(false);
+      setFollowersCount(prev => Math.max(0, prev - 1));
       await supabase.from('followers').delete()
         .eq('follower_id', user.id).eq('following_id', userId);
-      setFollowersCount(prev => Math.max(0, prev - 1));
+      await supabase.from('profiles')
+        .update({ followers_count: Math.max(0, followersCount - 1) })
+        .eq('id', userId);
     } else {
+      setIsFollowing(true);
+      setFollowersCount(prev => prev + 1);
       await supabase.from('followers').insert({
         follower_id: user.id,
         following_id: userId,
       });
-      setFollowersCount(prev => prev + 1);
+      await supabase.from('profiles')
+        .update({ followers_count: followersCount + 1 })
+        .eq('id', userId);
     }
-    setIsFollowing(prev => !prev);
-  }, [isFollowing, user?.id, userId]);
+  }, [isFollowing, user?.id, userId, followersCount]);
 
   const handleShare = useCallback(async () => {
     try {

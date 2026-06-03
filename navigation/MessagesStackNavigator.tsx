@@ -1,7 +1,7 @@
 import React from 'react';
-import { createStackNavigator } from '@react-navigation/stack';
-import MessagesScreen from '../screens/MessagesScreen';
-import ChatScreen from '../screens/ChatScreen';
+import { createStackNavigator, CardStyleInterpolators, TransitionPresets } from '@react-navigation/stack';
+import MessagesScreen    from '../screens/MessagesScreen';
+import ChatScreen        from '../screens/ChatScreen';
 import CreateGroupScreen from '../screens/CreateGroupScreen';
 import type { ChatUser } from '../hooks/useMessages';
 
@@ -14,12 +14,24 @@ export type MessagesStackParamList = {
 
 const Stack = createStackNavigator<MessagesStackParamList>();
 
+const SCREEN_BASE = {
+  headerShown: false,
+  cardStyle: { backgroundColor: '#140102' },
+  cardStyleInterpolator: CardStyleInterpolators.forHorizontalIOS,
+  gestureEnabled: true,
+} as const;
+
 export default function MessagesStackNavigator() {
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <Stack.Navigator screenOptions={SCREEN_BASE}>
       <Stack.Screen name="ConversationList" component={MessagesScreen} />
       <Stack.Screen name="Chat"             component={ChatScreen} />
-      <Stack.Screen name="CreateGroup"      component={CreateGroupScreen} />
+      {/* Slide from bottom — création de groupe */}
+      <Stack.Screen
+        name="CreateGroup"
+        component={CreateGroupScreen}
+        options={{ ...TransitionPresets.ModalSlideFromBottomIOS }}
+      />
     </Stack.Navigator>
   );
 }

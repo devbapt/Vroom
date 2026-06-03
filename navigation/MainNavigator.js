@@ -14,7 +14,10 @@ export default function MainNavigator() {
   return (
     <Tab.Navigator
       tabBar={(props) => <CustomTabBar {...props} />}
-      screenOptions={{ headerShown: false }}
+      screenOptions={{
+        headerShown: false,
+        sceneStyle: { backgroundColor: '#140102' },
+      }}
     >
       <Tab.Screen name="Home"     component={HomeStackNavigator} />
       <Tab.Screen name="Maps"     component={MapScreen} />

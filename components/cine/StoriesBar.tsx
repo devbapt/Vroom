@@ -108,8 +108,6 @@ const styles = StyleSheet.create({
   container: {
     height: BAR_HEIGHT,
     backgroundColor: C.bg,
-    borderBottomWidth: 0.5,
-    borderBottomColor: 'rgba(255,255,255,0.08)',
   },
   scrollContent: {
     paddingHorizontal: 16,

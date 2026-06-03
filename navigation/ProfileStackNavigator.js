@@ -1,33 +1,43 @@
 import React from 'react';
-import { createStackNavigator } from '@react-navigation/stack';
-import ProfileScreen from '../screens/ProfileScreen';
-import EditProfileScreen from '../screens/EditProfileScreen';
-import AddVehicleScreen from '../screens/AddVehicleScreen';
-import SettingsScreen from '../screens/SettingsScreen';
-import ActivityScreen from '../screens/ActivityScreen';
-import SavedScreen from '../screens/SavedScreen';
-import CreateStoryScreen from '../screens/CreateStoryScreen';
-import CreatePostScreen from '../screens/CreatePostScreen';
+import { createStackNavigator, CardStyleInterpolators, TransitionPresets } from '@react-navigation/stack';
+import ProfileScreen       from '../screens/ProfileScreen';
+import EditProfileScreen   from '../screens/EditProfileScreen';
+import AddVehicleScreen    from '../screens/AddVehicleScreen';
+import SettingsScreen      from '../screens/SettingsScreen';
+import ActivityScreen      from '../screens/ActivityScreen';
+import SavedScreen         from '../screens/SavedScreen';
+import CreateStoryScreen   from '../screens/CreateStoryScreen';
+import CreatePostScreen    from '../screens/CreatePostScreen';
 import ChangePasswordScreen from '../screens/ChangePasswordScreen';
 
 const Stack = createStackNavigator();
 
+const SCREEN_BASE = {
+  headerShown: false,
+  cardStyle: { backgroundColor: '#140102' },
+  cardStyleInterpolator: CardStyleInterpolators.forHorizontalIOS,
+  gestureEnabled: true,
+};
+
+const MODAL = { ...TransitionPresets.ModalSlideFromBottomIOS };
+
 export default function ProfileStackNavigator() {
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
-      <Stack.Screen
-        name="ProfileHome"
-        component={ProfileScreen}
-        options={{ gestureEnabled: false }}
-      />
-      <Stack.Screen name="EditProfile"      component={EditProfileScreen} />
-      <Stack.Screen name="AddVehicle"       component={AddVehicleScreen} />
-      <Stack.Screen name="Settings"         component={SettingsScreen} />
-      <Stack.Screen name="Activity"         component={ActivityScreen} />
-      <Stack.Screen name="Saved"            component={SavedScreen} />
-      <Stack.Screen name="CreateStory"      component={CreateStoryScreen} />
-      <Stack.Screen name="CreatePost"       component={CreatePostScreen} />
-      <Stack.Screen name="ChangePassword"   component={ChangePasswordScreen} />
+    <Stack.Navigator screenOptions={SCREEN_BASE}>
+      {/* Racine — pas de swipe-back */}
+      <Stack.Screen name="ProfileHome"     component={ProfileScreen}        options={{ gestureEnabled: false }} />
+
+      {/* Écrans horizontaux classiques */}
+      <Stack.Screen name="EditProfile"     component={EditProfileScreen} />
+      <Stack.Screen name="Settings"        component={SettingsScreen} />
+      <Stack.Screen name="Activity"        component={ActivityScreen} />
+      <Stack.Screen name="Saved"           component={SavedScreen} />
+      <Stack.Screen name="ChangePassword"  component={ChangePasswordScreen} />
+
+      {/* Modaux — slide from bottom */}
+      <Stack.Screen name="AddVehicle"      component={AddVehicleScreen}     options={MODAL} />
+      <Stack.Screen name="CreateStory"     component={CreateStoryScreen}    options={MODAL} />
+      <Stack.Screen name="CreatePost"      component={CreatePostScreen}     options={MODAL} />
     </Stack.Navigator>
   );
 }

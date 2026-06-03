@@ -5,6 +5,7 @@ import {
   TextInput,
   StyleSheet,
   KeyboardAvoidingView,
+  ScrollView,
   Platform,
   SafeAreaView,
   Pressable,
@@ -84,8 +85,14 @@ export default function LoginScreen({ navigation }: { navigation: any }) {
     <SafeAreaView style={styles.safeArea}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={[styles.container, { backgroundColor: COLORS.bg }]}
+        style={styles.keyboardView}
       >
+        <ScrollView
+          contentContainerStyle={styles.container}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          showsVerticalScrollIndicator={false}
+        >
         <View style={styles.headerContainer}>
           <View style={styles.logoRow}>
             <IconVroom width={72} height={72} />
@@ -202,6 +209,7 @@ export default function LoginScreen({ navigation }: { navigation: any }) {
             <Text style={styles.signupText}>Inscrivez-vous</Text>
           </Pressable>
         </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -209,7 +217,8 @@ export default function LoginScreen({ navigation }: { navigation: any }) {
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: COLORS.bg },
-  container: { flex: 1, paddingHorizontal: 25, justifyContent: 'center' },
+  keyboardView: { flex: 1 },
+  container: { flexGrow: 1, paddingHorizontal: 25, paddingVertical: 40, justifyContent: 'center' },
   headerContainer: { alignItems: 'center', marginBottom: 50 },
   logoRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   formContainer: { width: '100%' },
