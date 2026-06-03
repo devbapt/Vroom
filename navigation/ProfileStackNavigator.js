@@ -29,7 +29,8 @@ export default function ProfileStackNavigator() {
 
       {/* Écrans horizontaux classiques */}
       <Stack.Screen name="EditProfile"     component={EditProfileScreen} />
-      <Stack.Screen name="Settings"        component={SettingsScreen} />
+      {/* Settings slide du bas (chevron-down dans son header) */}
+      <Stack.Screen name="Settings"        component={SettingsScreen}      options={{ ...TransitionPresets.ModalSlideFromBottomIOS }} />
       <Stack.Screen name="Activity"        component={ActivityScreen} />
       <Stack.Screen name="Saved"           component={SavedScreen} />
       <Stack.Screen name="ChangePassword"  component={ChangePasswordScreen} />

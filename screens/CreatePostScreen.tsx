@@ -18,11 +18,13 @@ import * as ImagePicker from 'expo-image-picker';
 import { useNavigation } from '@react-navigation/native';
 import { supabase } from '../supabaseClient';
 import { useAppContext } from '../context';
+import { getTranslation } from '../i18n';
 import type {
   CineDrivePostType,
   AnyHUD,
   CineDrivePost,
 } from '../context/AppContext';
+import type { Translations } from '../i18n';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -47,51 +49,55 @@ type PostTypeConfig = {
   icon: keyof typeof Ionicons.glyphMap;
 };
 
-const POST_TYPES: PostTypeConfig[] = [
-  { type: 'track',     label: 'TRACK',     icon: 'speedometer-outline' },
-  { type: 'road_trip', label: 'ROAD TRIP',  icon: 'map-outline' },
-  { type: 'meet',      label: 'MEET',       icon: 'people-outline' },
-  { type: 'daily',     label: 'DAILY',      icon: 'car-outline' },
-  { type: 'build',     label: 'BUILD',      icon: 'construct-outline' },
-  { type: 'spotted',   label: 'SPOTTED',    icon: 'eye-outline' },
-];
+function getPostTypes(t: Translations['post']): PostTypeConfig[] {
+  return [
+    { type: 'track',     label: t.type_track,     icon: 'speedometer-outline' },
+    { type: 'road_trip', label: t.type_road_trip,  icon: 'map-outline' },
+    { type: 'meet',      label: t.type_meet,       icon: 'people-outline' },
+    { type: 'daily',     label: t.type_daily,      icon: 'car-outline' },
+    { type: 'build',     label: t.type_build,      icon: 'construct-outline' },
+    { type: 'spotted',   label: t.type_spotted,    icon: 'eye-outline' },
+  ];
+}
 
 // ─── HUD field definitions ────────────────────────────────────────────────────
 
 type HUDFieldDef = { key: string; label: string; placeholder: string; keyboardType?: 'default' | 'numeric' };
 
-const HUD_FIELDS: Record<CineDrivePostType, HUDFieldDef[]> = {
-  track: [
-    { key: 'power',        label: 'POWER (hp)',     placeholder: '525hp' },
-    { key: 'acceleration', label: '0–100 (s)',      placeholder: '3.2s' },
-    { key: 'lapTime',      label: 'LAP TIME',       placeholder: '1:58.4' },
-    { key: 'avgSpeed',     label: 'VIT. MOY. (km/h)', placeholder: '142 km/h' },
-  ],
-  road_trip: [
-    { key: 'distance', label: 'DISTANCE',  placeholder: '142km' },
-    { key: 'duration', label: 'DURÉE',     placeholder: '3h12' },
-    { key: 'crew',     label: 'CREW (nb voitures)', placeholder: '4' },
-  ],
-  meet: [
-    { key: 'city',   label: 'VILLE',    placeholder: 'PARIS' },
-    { key: 'people', label: 'PERSONNES', placeholder: '120+' },
-    { key: 'cars',   label: 'VOITURES', placeholder: '87' },
-  ],
-  daily: [
-    { key: 'power',        label: 'POWER (hp)',     placeholder: '365hp' },
-    { key: 'acceleration', label: '0–100 (s)',      placeholder: '4.6s' },
-    { key: 'transmission', label: 'TRANSMISSION',   placeholder: 'PDK' },
-  ],
-  build: [
-    { key: 'mods',   label: 'MODS',    placeholder: '12/15' },
-    { key: 'budget', label: 'BUDGET',  placeholder: '€42k' },
-    { key: 'phase',  label: 'PHASE',   placeholder: '3/5' },
-  ],
-  spotted: [
-    { key: 'city',  label: 'VILLE',  placeholder: 'GENÈVE' },
-    { key: 'model', label: 'MODÈLE', placeholder: 'CHIRON' },
-  ],
-};
+function getHudFields(t: Translations['post']): Record<CineDrivePostType, HUDFieldDef[]> {
+  return {
+    track: [
+      { key: 'power',        label: t.power,       placeholder: '525hp' },
+      { key: 'acceleration', label: t.acceleration, placeholder: '3.2s' },
+      { key: 'lapTime',      label: t.lapTime,      placeholder: '1:58.4' },
+      { key: 'avgSpeed',     label: t.avgSpeed,     placeholder: '142 km/h' },
+    ],
+    road_trip: [
+      { key: 'distance', label: t.distance, placeholder: '142km' },
+      { key: 'duration', label: t.duration, placeholder: '3h12' },
+      { key: 'crew',     label: t.crew,     placeholder: '4' },
+    ],
+    meet: [
+      { key: 'city',   label: t.city,   placeholder: 'PARIS' },
+      { key: 'people', label: t.people, placeholder: '120+' },
+      { key: 'cars',   label: t.cars,   placeholder: '87' },
+    ],
+    daily: [
+      { key: 'power',        label: t.power,        placeholder: '365hp' },
+      { key: 'acceleration', label: t.acceleration,  placeholder: '4.6s' },
+      { key: 'transmission', label: t.transmission,  placeholder: 'PDK' },
+    ],
+    build: [
+      { key: 'mods',   label: t.mods,   placeholder: '12/15' },
+      { key: 'budget', label: t.budget, placeholder: '€42k' },
+      { key: 'phase',  label: t.phase,  placeholder: '3/5' },
+    ],
+    spotted: [
+      { key: 'city',  label: t.city,  placeholder: 'GENÈVE' },
+      { key: 'model', label: t.model, placeholder: 'CHIRON' },
+    ],
+  };
+}
 
 // ─── Helper: build HUD from form values ───────────────────────────────────────
 
@@ -157,10 +163,10 @@ function FieldInput({
   );
 }
 
-function RaritySelector({ value, onChange }: { value: number; onChange: (v: 1|2|3|4|5) => void }) {
+function RaritySelector({ value, onChange, label }: { value: number; onChange: (v: 1|2|3|4|5) => void; label: string }) {
   return (
     <View style={styles.fieldWrapper}>
-      <Text style={styles.fieldLabel}>RARETÉ</Text>
+      <Text style={styles.fieldLabel}>{label}</Text>
       <View style={styles.rarityRow}>
         {([1, 2, 3, 4, 5] as const).map((n) => (
           <Pressable
@@ -185,7 +191,10 @@ function RaritySelector({ value, onChange }: { value: number; onChange: (v: 1|2|
 export default function CreatePostScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
-  const { user, addCinePost } = useAppContext();
+  const { user, addCinePost, language } = useAppContext();
+  const t = getTranslation(language).post;
+  const POST_TYPES = getPostTypes(t);
+  const HUD_FIELDS = getHudFields(t);
 
   const [photos, setPhotos] = useState<{ uri: string; base64: string | null }[]>([]);
   const [postType, setPostType] = useState<CineDrivePostType>('road_trip');
@@ -241,11 +250,11 @@ export default function CreatePostScreen() {
 
   const handlePublish = useCallback(async () => {
     if (photos.length === 0) {
-      Alert.alert('Photo requise', 'Ajoute au moins une photo pour publier.');
+      Alert.alert(t.photoRequired, t.photoRequiredMsg);
       return;
     }
     if (!brand.trim()) {
-      Alert.alert('Véhicule requis', 'Renseigne la marque de ton véhicule.');
+      Alert.alert(t.vehicleRequired, t.vehicleRequiredMsg);
       return;
     }
     if (!user?.id) return;
@@ -294,7 +303,7 @@ export default function CreatePostScreen() {
         .single();
 
       if (insertError) {
-        Alert.alert('Erreur', 'Impossible de publier le post.');
+        Alert.alert(t.errorTitle, t.errorMsg);
         return;
       }
 
@@ -324,7 +333,7 @@ export default function CreatePostScreen() {
       addCinePost(newPost);
       navigation.goBack();
     } catch (e) {
-      Alert.alert('Erreur', 'Une erreur est survenue lors de la publication.');
+      Alert.alert(t.errorTitle, t.errorGeneric);
     } finally {
       setIsPublishing(false);
     }
@@ -342,13 +351,13 @@ export default function CreatePostScreen() {
         <Pressable onPress={() => navigation.goBack()} hitSlop={12}>
           <Ionicons name="arrow-back" size={24} color={C.white} />
         </Pressable>
-        <Text style={styles.headerTitle}>NOUVEAU POST</Text>
+        <Text style={styles.headerTitle}>{t.newPost}</Text>
         <Pressable
           style={({ pressed }) => [styles.publishBtn, pressed && { opacity: 0.8 }]}
           onPress={handlePublish}
           disabled={isPublishing}
         >
-          <Text style={styles.publishBtnText}>{isPublishing ? '...' : 'PUBLIER'}</Text>
+          <Text style={styles.publishBtnText}>{isPublishing ? t.publishing : t.publish}</Text>
         </Pressable>
       </View>
 
@@ -359,7 +368,7 @@ export default function CreatePostScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* ── Photo Picker ── */}
-        <SectionTitle label="PHOTOS" />
+        <SectionTitle label={t.photos} />
 
         <ScrollView
           horizontal
@@ -390,14 +399,14 @@ export default function CreatePostScreen() {
             >
               <Ionicons name="add" size={32} color={C.whiteSoft} />
               <Text style={styles.addPhotoText}>
-                {photos.length === 0 ? 'Ajouter des photos' : 'Ajouter'}
+                {photos.length === 0 ? t.addPhotos : t.addMore}
               </Text>
             </Pressable>
           )}
         </ScrollView>
 
         {/* ── Post Type ── */}
-        <SectionTitle label="TYPE DE POST" />
+        <SectionTitle label={t.postType} />
 
         <ScrollView
           horizontal
@@ -426,26 +435,26 @@ export default function CreatePostScreen() {
         </ScrollView>
 
         {/* ── Vehicle ── */}
-        <SectionTitle label="VÉHICULE" />
+        <SectionTitle label={t.vehicle} />
 
         <View style={styles.vehicleRow}>
           <View style={{ flex: 2 }}>
-            <FieldInput label="MARQUE" value={brand} onChangeText={setBrand} placeholder="PORSCHE" />
+            <FieldInput label={t.brand} value={brand} onChangeText={setBrand} placeholder="PORSCHE" />
           </View>
           <View style={{ flex: 3 }}>
-            <FieldInput label="MODÈLE" value={model} onChangeText={setModel} placeholder="911 GT3 RS" />
+            <FieldInput label={t.modelField} value={model} onChangeText={setModel} placeholder="911 GT3 RS" />
           </View>
           <View style={{ flex: 1 }}>
-            <FieldInput label="ANNÉE" value={year} onChangeText={setYear} placeholder="2024" keyboardType="numeric" />
+            <FieldInput label={t.year} value={year} onChangeText={setYear} placeholder="2024" keyboardType="numeric" />
           </View>
         </View>
 
         {/* ── Location ── */}
-        <SectionTitle label="LIEU" />
+        <SectionTitle label={t.location} />
         <FieldInput value={location} onChangeText={setLocation} placeholder="Col de Turini, France" />
 
         {/* ── HUD Data ── */}
-        <SectionTitle label="DONNÉES SESSION" />
+        <SectionTitle label={t.sessionData} />
 
         <View style={styles.hudGrid}>
           {hudFields.map((field) => (
@@ -460,17 +469,17 @@ export default function CreatePostScreen() {
           ))}
           {postType === 'spotted' && (
             <View style={styles.hudFieldWrapper}>
-              <RaritySelector value={rarity} onChange={setRarity} />
+              <RaritySelector value={rarity} onChange={setRarity} label={t.rarity} />
             </View>
           )}
         </View>
 
         {/* ── Description ── */}
-        <SectionTitle label="DESCRIPTION (optionnel)" />
+        <SectionTitle label={t.descriptionSection} />
         <FieldInput
           value={description}
           onChangeText={setDescription}
-          placeholder="Décris ta session, ton véhicule, l'ambiance..."
+          placeholder={t.descriptionPlaceholder}
           multiline
         />
         <Text style={styles.charCount}>{description.length}/300</Text>
