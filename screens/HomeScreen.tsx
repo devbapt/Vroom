@@ -7,9 +7,10 @@ import {
   Platform,
   StatusBar,
   ListRenderItemInfo,
+  RefreshControl,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { supabase } from '../supabaseClient';
 import { useAppContext } from '../context';
 import HomeHeader from '../components/cine/HomeHeader';
@@ -59,6 +60,7 @@ export default function HomeScreen() {
   const { feedStories, markStoryAsViewed, removeFeedStory, user, toggleSaveCinePost, deletedPostIds } = useAppContext();
 
   const [posts, setPosts] = useState<CineDrivePostData[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
   const [storyViewerVisible, setStoryViewerVisible] = useState(false);
   const [viewerHighlightId, setViewerHighlightId] = useState('');
   const [viewerStories, setViewerStories] = useState<{ id: string; image: string; userId?: string }[]>([]);
@@ -75,61 +77,60 @@ export default function HomeScreen() {
 
   // ── Fetch feed posts from Supabase ────────────────────────────────────────
 
-  useEffect(() => {
-    let cancelled = false;
+  const fetchPosts = useCallback(async () => {
+    const userId = user?.id;
 
-    const fetchPosts = async () => {
-      const userId = user?.id;
-
-      // Fetch saved + liked post IDs for current user
-      const savedIdsSet = new Set<string>();
-      const likedIdsSet = new Set<string>();
-      if (userId) {
-        const [savedRes, likedRes] = await Promise.all([
-          supabase.from('saved_posts').select('post_id').eq('user_id', userId),
-          supabase.from('post_likes').select('post_id').eq('user_id', userId),
-        ]);
-        (savedRes.data ?? []).forEach((r: any) => savedIdsSet.add(r.post_id));
-        (likedRes.data ?? []).forEach((r: any) => likedIdsSet.add(r.post_id));
-      }
-
-      // Two queries: official vroom posts + current user's posts
-      const [vroomRes, userRes] = await Promise.all([
-        supabase
-          .from('posts')
-          .select('*, profiles!user_id(id, username, full_name, avatar_url)')
-          .eq('profiles.username', 'vroom')
-          .order('created_at', { ascending: false })
-          .limit(30),
-        userId
-          ? supabase
-              .from('posts')
-              .select('*, profiles!user_id(id, username, full_name, avatar_url)')
-              .eq('user_id', userId)
-              .order('created_at', { ascending: false })
-              .limit(30)
-          : Promise.resolve({ data: [] }),
+    const savedIdsSet = new Set<string>();
+    const likedIdsSet = new Set<string>();
+    if (userId) {
+      const [savedRes, likedRes] = await Promise.all([
+        supabase.from('saved_posts').select('post_id').eq('user_id', userId),
+        supabase.from('post_likes').select('post_id').eq('user_id', userId),
       ]);
+      (savedRes.data ?? []).forEach((r: any) => savedIdsSet.add(r.post_id));
+      (likedRes.data ?? []).forEach((r: any) => likedIdsSet.add(r.post_id));
+    }
 
-      if (cancelled) return;
+    const [vroomRes, userRes] = await Promise.all([
+      supabase
+        .from('posts')
+        .select('*, profiles!user_id(id, username, full_name, avatar_url)')
+        .eq('profiles.username', 'vroom')
+        .order('created_at', { ascending: false })
+        .limit(30),
+      userId
+        ? supabase
+            .from('posts')
+            .select('*, profiles!user_id(id, username, full_name, avatar_url)')
+            .eq('user_id', userId)
+            .order('created_at', { ascending: false })
+            .limit(30)
+        : Promise.resolve({ data: [] }),
+    ]);
 
-      const allRows: any[] = [...(vroomRes.data ?? []), ...(userRes.data ?? [])];
-      const seen = new Set<string>();
-      const unique = allRows.filter(r => {
-        if (seen.has(r.id)) return false;
-        seen.add(r.id);
-        return true;
-      });
-      unique.sort(
-        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-      );
-
-      setPosts(unique.map(r => mapRowToPost(r, savedIdsSet, likedIdsSet)));
-    };
-
-    fetchPosts();
-    return () => { cancelled = true; };
+    const allRows: any[] = [...(vroomRes.data ?? []), ...(userRes.data ?? [])];
+    const seen = new Set<string>();
+    const unique = allRows.filter(r => {
+      if (seen.has(r.id)) return false;
+      seen.add(r.id);
+      return true;
+    });
+    unique.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    setPosts(unique.map(r => mapRowToPost(r, savedIdsSet, likedIdsSet)));
   }, [user?.id]);
+
+  // Charge le feed au montage et à chaque retour sur l'écran (ex: après publication)
+  useFocusEffect(
+    useCallback(() => {
+      fetchPosts();
+    }, [fetchPosts])
+  );
+
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await fetchPosts();
+    setRefreshing(false);
+  }, [fetchPosts]);
 
   useEffect(() => {
     if (deletedPostIds.length === 0) return;
@@ -227,6 +228,14 @@ export default function HomeScreen() {
           offset: postHeight * index,
           index,
         })}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor="#E50914"
+            colors={['#E50914']}
+          />
+        }
       />
 
       {/* Header + StoriesBar flottants par-dessus le feed */}

@@ -1,27 +1,18 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  FlatList,
-  TextInput,
-  Pressable,
-  ActivityIndicator,
-  ListRenderItemInfo,
-  Platform,
-  Alert,
+  View, Text, StyleSheet, FlatList, TextInput, Pressable,
+  ActivityIndicator, ListRenderItemInfo, Platform, Alert,
+  TouchableOpacity, ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Image as ExpoImage } from 'expo-image';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { supabase } from '../supabaseClient';
 import { useAppContext } from '../context/AppContext';
 import {
-  useConversations,
-  findOrCreateConversation,
-  type ConversationPreview,
-  type ChatUser,
+  useConversations, findOrCreateConversation,
+  type ConversationPreview, type ChatUser,
 } from '../hooks/useMessages';
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
@@ -32,26 +23,37 @@ const C = {
   accent:   '#D91D2F',
   muted:    '#8E8E93',
   border:   '#F0F0F0',
-  inputBg:  '#F7F7F7',
+  inputBg:  '#F5F5F7',
   rowHover: '#FAFAFA',
+  groupTag: 'rgba(217,29,47,0.08)',
 };
 
 const PAD = 16;
-const AVATAR_SIZE = 50;
-const BADGE_SIZE  = 20;
+const AVATAR = 52;
 
-type Tab = 'groupes' | 'prive';
+type SearchMode = 'users' | 'groups';
 
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+type Group = {
+  id: string;
+  name: string;
+  description: string | null;
+  avatar_url: string | null;
+  is_private: boolean;
+  member_count: number;
+  my_role?: string | null;
+};
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function formatTimestamp(iso: string): string {
   const d = new Date(iso);
   const now = new Date();
-  const diffDays = Math.floor((now.getTime() - d.getTime()) / 86_400_000);
-  if (diffDays === 0) return d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
-  if (diffDays === 1) return 'Hier';
-  if (diffDays < 7)   return d.toLocaleDateString('fr-FR', { weekday: 'short' });
+  const diff = Math.floor((now.getTime() - d.getTime()) / 86_400_000);
+  if (diff === 0) return d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+  if (diff === 1) return 'Hier';
+  if (diff < 7)   return d.toLocaleDateString('fr-FR', { weekday: 'short' });
   return d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' });
 }
 
@@ -59,71 +61,108 @@ function formatTimestamp(iso: string): string {
 
 function Avatar({ user }: { user: ChatUser }) {
   const initials = (user.username ?? '?').slice(0, 2).toUpperCase();
-  if (user.avatar_url) {
-    return (
-      <ExpoImage
-        source={user.avatar_url}
-        style={styles.avatar}
-        contentFit="cover"
-        cachePolicy="memory-disk"
-      />
-    );
-  }
-  return (
+  return user.avatar_url ? (
+    <ExpoImage source={user.avatar_url} style={styles.avatar} contentFit="cover" cachePolicy="memory-disk" />
+  ) : (
     <View style={[styles.avatar, styles.avatarFallback]}>
       <Text style={styles.avatarText}>{initials}</Text>
     </View>
   );
 }
 
-// ─── Conversation row (real DMs) ──────────────────────────────────────────────
+function GroupAvatar({ group }: { group: Group }) {
+  const initials = group.name.slice(0, 2).toUpperCase();
+  return group.avatar_url ? (
+    <ExpoImage source={group.avatar_url} style={styles.avatar} contentFit="cover" cachePolicy="memory-disk" />
+  ) : (
+    <View style={[styles.avatar, styles.groupAvatarFallback]}>
+      <Text style={styles.avatarText}>{initials}</Text>
+    </View>
+  );
+}
 
-function ConvRow({ item, onPress }: { item: ConversationPreview; onPress: (c: ConversationPreview) => void }) {
+// ─── Conv Row ─────────────────────────────────────────────────────────────────
+
+function ConvRow({ item, onPress }: { item: ConversationPreview; onPress: () => void }) {
   return (
-    <Pressable
-      style={({ pressed }) => [styles.row, pressed && { backgroundColor: C.rowHover }]}
-      onPress={() => onPress(item)}
-    >
+    <Pressable style={({ pressed }) => [styles.row, pressed && { backgroundColor: C.rowHover }]} onPress={onPress}>
       <Avatar user={item.otherUser} />
       <View style={styles.rowCenter}>
         <Text style={[styles.rowName, item.unreadCount > 0 && styles.bold]} numberOfLines={1}>
-          {item.otherUser.username ? `@${item.otherUser.username}` : 'Utilisateur inconnu'}
+          {item.otherUser.username ? `@${item.otherUser.username}` : 'Utilisateur'}
         </Text>
-        <Text style={[styles.rowLast, item.unreadCount > 0 && styles.rowLastUnread]} numberOfLines={1}>
+        <Text style={[styles.rowSub, item.unreadCount > 0 && styles.rowSubUnread]} numberOfLines={1}>
           {item.lastMessage ?? 'Démarrer une conversation'}
         </Text>
       </View>
       <View style={styles.rowRight}>
         {item.lastMessageAt && <Text style={styles.rowTime}>{formatTimestamp(item.lastMessageAt)}</Text>}
         {item.unreadCount > 0 && (
-          <View style={styles.badge}>
-            <Text style={styles.badgeText}>{item.unreadCount > 99 ? '99+' : item.unreadCount}</Text>
-          </View>
+          <View style={styles.badge}><Text style={styles.badgeText}>{item.unreadCount > 99 ? '99+' : item.unreadCount}</Text></View>
         )}
       </View>
     </Pressable>
   );
 }
 
+// ─── Group Row ────────────────────────────────────────────────────────────────
 
-// ─── Search result row ────────────────────────────────────────────────────────
-
-function SearchRow({ user, onPress, loading }: { user: ChatUser; onPress: (u: ChatUser) => void; loading: boolean }) {
+function GroupRow({ group, onPress }: { group: Group; onPress: () => void }) {
   return (
-    <Pressable
-      style={({ pressed }) => [styles.row, pressed && { backgroundColor: C.rowHover }]}
-      onPress={() => onPress(user)}
-      disabled={loading}
-    >
+    <Pressable style={({ pressed }) => [styles.row, pressed && { backgroundColor: C.rowHover }]} onPress={onPress}>
+      <GroupAvatar group={group} />
+      <View style={styles.rowCenter}>
+        <View style={styles.groupNameRow}>
+          <Text style={styles.rowName} numberOfLines={1}>{group.name}</Text>
+          {group.is_private && (
+            <View style={styles.privateBadge}>
+              <Ionicons name="lock-closed" size={9} color={C.accent} />
+            </View>
+          )}
+          {group.my_role === 'admin' && (
+            <View style={styles.adminBadge}><Text style={styles.adminBadgeText}>Admin</Text></View>
+          )}
+        </View>
+        <Text style={styles.rowSub} numberOfLines={1}>
+          {group.description ?? `${group.member_count} membre${group.member_count > 1 ? 's' : ''}`}
+        </Text>
+      </View>
+      <View style={styles.rowRight}>
+        <Text style={styles.memberCount}>
+          <Ionicons name="people-outline" size={11} color={C.muted} /> {group.member_count}
+        </Text>
+      </View>
+    </Pressable>
+  );
+}
+
+// ─── Search result rows ───────────────────────────────────────────────────────
+
+function UserResultRow({ user, loading, onPress }: { user: ChatUser; loading: boolean; onPress: () => void }) {
+  return (
+    <Pressable style={({ pressed }) => [styles.row, pressed && { backgroundColor: C.rowHover }]} onPress={onPress} disabled={loading}>
       <Avatar user={user} />
       <View style={styles.rowCenter}>
         <Text style={styles.rowName}>@{user.username}</Text>
-        <Text style={styles.rowLast}>Démarrer une conversation</Text>
+        <Text style={styles.rowSub}>Message privé</Text>
       </View>
-      {loading
-        ? <ActivityIndicator size="small" color={C.accent} />
-        : <Ionicons name="chevron-forward" size={16} color={C.muted} />
-      }
+      {loading ? <ActivityIndicator size="small" color={C.accent} /> : <Ionicons name="chevron-forward" size={15} color={C.muted} />}
+    </Pressable>
+  );
+}
+
+function GroupResultRow({ group, onPress }: { group: Group; onPress: () => void }) {
+  return (
+    <Pressable style={({ pressed }) => [styles.row, pressed && { backgroundColor: C.rowHover }]} onPress={onPress}>
+      <GroupAvatar group={group} />
+      <View style={styles.rowCenter}>
+        <View style={styles.groupNameRow}>
+          <Text style={styles.rowName} numberOfLines={1}>{group.name}</Text>
+          {group.is_private && <View style={styles.privateBadge}><Ionicons name="lock-closed" size={9} color={C.accent} /></View>}
+        </View>
+        <Text style={styles.rowSub} numberOfLines={1}>{group.member_count} membre{group.member_count > 1 ? 's' : ''}</Text>
+      </View>
+      <Ionicons name="chevron-forward" size={15} color={C.muted} />
     </Pressable>
   );
 }
@@ -131,105 +170,106 @@ function SearchRow({ user, onPress, loading }: { user: ChatUser; onPress: (u: Ch
 // ─── Main screen ──────────────────────────────────────────────────────────────
 
 export default function MessagesScreen() {
-  const navigation   = useNavigation<any>();
-  const { user }     = useAppContext();
+  const navigation = useNavigation<any>();
+  const { user } = useAppContext();
   const currentUserId = user?.id ?? '';
 
   const { conversations, loading: loadingConvs, reload } = useConversations(currentUserId);
 
-  const [activeTab, setActiveTab]         = useState<Tab>('prive');
+  const [activeTab, setActiveTab]         = useState<'groupes' | 'prive'>('prive');
   const [query, setQuery]                 = useState('');
   const [searchFocused, setSearchFocused] = useState(false);
-  const [searchResults, setSearchResults] = useState<ChatUser[]>([]);
+  const [searchMode, setSearchMode]       = useState<SearchMode>('users');
+  const [userResults, setUserResults]     = useState<ChatUser[]>([]);
+  const [groupResults, setGroupResults]   = useState<Group[]>([]);
   const [searching, setSearching]         = useState(false);
   const [openingId, setOpeningId]         = useState<string | null>(null);
-
+  const [myGroups, setMyGroups]           = useState<Group[]>([]);
+  const [loadingGroups, setLoadingGroups] = useState(false);
   const searchRef = useRef<TextInput>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // ── Search users ──────────────────────────────────────────────────────────
+  // Load my groups
+  const loadMyGroups = useCallback(async () => {
+    if (!currentUserId) return;
+    setLoadingGroups(true);
+    const { data } = await supabase
+      .from('group_members')
+      .select('role, groups(id, name, description, avatar_url, is_private, member_count)')
+      .eq('user_id', currentUserId);
+    setMyGroups((data ?? []).map((r: any) => ({ ...r.groups, my_role: r.role })));
+    setLoadingGroups(false);
+  }, [currentUserId]);
+
+  useFocusEffect(useCallback(() => { loadMyGroups(); }, [loadMyGroups]));
+
+  // Search
   useEffect(() => {
-    if (!query.trim()) { setSearchResults([]); return; }
-    setSearching(true);
-    const timer = setTimeout(async () => {
-      const { data } = await supabase
-        .from('profiles')
-        .select('id, username, avatar_url')
-        .ilike('username', `%${query.trim()}%`)
-        .neq('id', currentUserId)
-        .limit(12);
-      setSearchResults((data as ChatUser[]) ?? []);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (!query.trim()) { setUserResults([]); setGroupResults([]); return; }
+
+    debounceRef.current = setTimeout(async () => {
+      setSearching(true);
+      const [usersRes, groupsRes] = await Promise.all([
+        supabase.from('profiles').select('id, username, avatar_url')
+          .ilike('username', `%${query.trim()}%`).neq('id', currentUserId).limit(8),
+        supabase.from('groups').select('id, name, description, avatar_url, is_private, member_count')
+          .ilike('name', `%${query.trim()}%`).limit(8),
+      ]);
+      setUserResults((usersRes.data as ChatUser[]) ?? []);
+      setGroupResults((groupsRes.data as Group[]) ?? []);
       setSearching(false);
     }, 300);
-    return () => clearTimeout(timer);
   }, [query, currentUserId]);
 
-  // ── Open / create conversation ────────────────────────────────────────────
+  // Open DM
   const openChat = useCallback(async (otherUser: ChatUser) => {
     if (openingId) return;
     setOpeningId(otherUser.id);
     try {
       const convId = await findOrCreateConversation(currentUserId, otherUser.id);
-      setQuery('');
-      setSearchResults([]);
-      setSearchFocused(false);
+      setQuery(''); setUserResults([]); setGroupResults([]); setSearchFocused(false);
       navigation.navigate('Chat', { conversationId: convId, otherUser });
       reload();
     } catch (e: any) {
-      console.error('openChat error', e);
-      const msg = e?.message ?? 'Impossible de démarrer la conversation.';
-      Platform.OS === 'web' ? alert(msg) : Alert.alert('Erreur', msg);
-    } finally {
-      setOpeningId(null);
-    }
+      Platform.OS === 'web' ? alert(e?.message) : Alert.alert('Erreur', e?.message);
+    } finally { setOpeningId(null); }
   }, [currentUserId, navigation, openingId, reload]);
 
-  const openExisting = useCallback((item: ConversationPreview) => {
-    navigation.navigate('Chat', { conversationId: item.id, otherUser: item.otherUser });
+  const openGroup = useCallback((group: Group) => {
+    navigation.navigate('GroupDetail', { groupId: group.id, groupName: group.name });
   }, [navigation]);
 
   const clearSearch = useCallback(() => {
-    setQuery('');
-    setSearchResults([]);
-    setSearchFocused(false);
+    setQuery(''); setUserResults([]); setGroupResults([]); setSearchFocused(false);
   }, []);
 
   const showSearch = searchFocused || query.length > 0;
-
-  // ── Render helpers ────────────────────────────────────────────────────────
-  const renderConv = useCallback(
-    ({ item }: ListRenderItemInfo<ConversationPreview>) => <ConvRow item={item} onPress={openExisting} />,
-    [openExisting]
-  );
-
-  const renderSearch = useCallback(
-    ({ item }: ListRenderItemInfo<ChatUser>) => (
-      <SearchRow user={item} onPress={openChat} loading={openingId === item.id} />
-    ),
-    [openChat, openingId]
-  );
+  const hasResults = userResults.length > 0 || groupResults.length > 0;
 
   return (
     <SafeAreaView style={styles.root} edges={['top']}>
       {/* ── Header ── */}
       <View style={styles.header}>
         <Text style={styles.title}>Messagerie</Text>
-        <Pressable
-          style={({ pressed }) => [styles.composeBtn, pressed && { opacity: 0.5 }]}
-          hitSlop={12}
-          onPress={() => { setActiveTab('prive'); setTimeout(() => searchRef.current?.focus(), 50); }}
+        <TouchableOpacity
+          style={styles.composeBtn}
+          onPress={() => navigation.navigate('CreateGroup')}
+          activeOpacity={0.7}
         >
-          <Ionicons name="create-outline" size={22} color={C.dark} />
-        </Pressable>
+          <Ionicons name="people-outline" size={18} color={C.accent} />
+          <Ionicons name="add" size={12} color={C.accent} style={{ marginLeft: -3, marginTop: -8 }} />
+        </TouchableOpacity>
       </View>
 
-      {/* ── Search bar ── */}
+      {/* ── Search ── */}
       <View style={styles.searchWrap}>
         <View style={[styles.searchBar, searchFocused && styles.searchBarFocused]}>
-          <Ionicons name="search" size={16} color={C.muted} style={{ marginRight: 6 }} />
+          <Ionicons name="search" size={15} color={searchFocused ? C.accent : C.muted} style={{ marginRight: 6 }} />
           <TextInput
             ref={searchRef}
             style={[styles.searchInput, Platform.OS === 'web' && { outlineStyle: 'none' } as any]}
-            placeholder="Chercher un pilote..."
+            placeholder="Chercher un pilote ou un groupe…"
             placeholderTextColor={C.muted}
             value={query}
             onChangeText={setQuery}
@@ -240,26 +280,26 @@ export default function MessagesScreen() {
           />
           {query.length > 0 && (
             <Pressable onPress={clearSearch} hitSlop={8}>
-              <Ionicons name="close-circle" size={16} color={C.muted} />
+              <Ionicons name="close-circle" size={15} color={C.muted} />
             </Pressable>
           )}
         </View>
         {showSearch && (
-          <Pressable style={styles.cancelBtn} onPress={clearSearch}>
+          <TouchableOpacity style={styles.cancelBtn} onPress={clearSearch}>
             <Text style={styles.cancelText}>Annuler</Text>
-          </Pressable>
+          </TouchableOpacity>
         )}
       </View>
 
-      {/* ── Segment control (always visible) ── */}
+      {/* ── Tabs (hidden during search) ── */}
       {!showSearch && (
         <View style={styles.tabs}>
-          {(['groupes', 'prive'] as const).map((tab) => {
+          {(['prive', 'groupes'] as const).map((tab) => {
             const active = activeTab === tab;
             return (
               <Pressable key={tab} style={styles.tabItem} onPress={() => setActiveTab(tab)}>
                 <Text style={[styles.tabLabel, active && styles.tabLabelActive]}>
-                  {tab === 'groupes' ? 'Groupes' : 'Privé'}
+                  {tab === 'prive' ? 'Privé' : 'Groupes'}
                 </Text>
                 {active && <View style={styles.tabIndicator} />}
               </Pressable>
@@ -270,56 +310,86 @@ export default function MessagesScreen() {
 
       {/* ── Content ── */}
       {showSearch ? (
-        // Search results
+        /* SEARCH RESULTS */
         searching ? (
           <View style={styles.center}><ActivityIndicator color={C.accent} /></View>
-        ) : searchResults.length === 0 && query.trim() ? (
+        ) : !hasResults && query.trim() ? (
           <View style={styles.center}>
-            <Ionicons name="search-outline" size={40} color={C.border} />
-            <Text style={styles.emptyText}>Aucun pilote trouvé pour "{query}"</Text>
+            <Ionicons name="search-outline" size={42} color={C.border} />
+            <Text style={styles.emptyText}>Aucun résultat pour "{query}"</Text>
+          </View>
+        ) : (
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 32 }}>
+            {userResults.length > 0 && (
+              <>
+                <Text style={styles.sectionLabel}>Pilotes</Text>
+                {userResults.map(u => (
+                  <UserResultRow
+                    key={u.id} user={u}
+                    loading={openingId === u.id}
+                    onPress={() => openChat(u)}
+                  />
+                ))}
+              </>
+            )}
+            {groupResults.length > 0 && (
+              <>
+                <Text style={styles.sectionLabel}>Groupes</Text>
+                {groupResults.map(g => (
+                  <GroupResultRow key={g.id} group={g} onPress={() => openGroup(g)} />
+                ))}
+              </>
+            )}
+          </ScrollView>
+        )
+      ) : activeTab === 'prive' ? (
+        /* DMs */
+        loadingConvs ? (
+          <View style={styles.center}><ActivityIndicator color={C.accent} /></View>
+        ) : conversations.length === 0 ? (
+          <View style={styles.center}>
+            <Ionicons name="chatbubble-ellipses-outline" size={48} color={C.border} />
+            <Text style={styles.emptyTitle}>Aucun message</Text>
+            <Text style={styles.emptyText}>Cherche un pilote pour démarrer</Text>
+            <TouchableOpacity style={styles.emptyBtn} onPress={() => setTimeout(() => searchRef.current?.focus(), 50)}>
+              <Text style={styles.emptyBtnText}>Trouver un pilote</Text>
+            </TouchableOpacity>
           </View>
         ) : (
           <FlatList
-            data={searchResults}
-            renderItem={renderSearch}
-            keyExtractor={(u) => u.id}
-            contentContainerStyle={styles.list}
-            keyboardShouldPersistTaps="handled"
+            data={conversations}
+            renderItem={({ item }: ListRenderItemInfo<ConversationPreview>) => (
+              <ConvRow item={item} onPress={() => navigation.navigate('Chat', { conversationId: item.id, otherUser: item.otherUser })} />
+            )}
+            keyExtractor={c => c.id}
             showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingBottom: 20 }}
             ItemSeparatorComponent={() => <View style={styles.sep} />}
           />
         )
-      ) : activeTab === 'groupes' ? (
-        <View style={styles.center}>
-          <Ionicons name="people-outline" size={52} color={C.border} />
-          <Text style={styles.emptyTitle}>Groupes</Text>
-          <Text style={styles.emptyText}>Les groupes arrivent bientôt.{'\n'}Reste connecté 🏎️</Text>
-        </View>
-      ) : loadingConvs ? (
-        <View style={styles.center}><ActivityIndicator color={C.accent} /></View>
-      ) : conversations.length === 0 ? (
-        // Privé — empty state
-        <View style={styles.center}>
-          <Ionicons name="chatbubble-ellipses-outline" size={48} color={C.border} />
-          <Text style={styles.emptyTitle}>Aucun message privé</Text>
-          <Text style={styles.emptyText}>Cherche un pilote pour démarrer une conversation</Text>
-          <Pressable
-            style={styles.emptyBtn}
-            onPress={() => setTimeout(() => searchRef.current?.focus(), 50)}
-          >
-            <Text style={styles.emptyBtnText}>Trouver un pilote</Text>
-          </Pressable>
-        </View>
       ) : (
-        // Privé — real conversations
-        <FlatList
-          data={conversations}
-          renderItem={renderConv}
-          keyExtractor={(c) => c.id}
-          contentContainerStyle={styles.list}
-          showsVerticalScrollIndicator={false}
-          ItemSeparatorComponent={() => <View style={styles.sep} />}
-        />
+        /* GROUPS */
+        loadingGroups ? (
+          <View style={styles.center}><ActivityIndicator color={C.accent} /></View>
+        ) : myGroups.length === 0 ? (
+          <View style={styles.center}>
+            <Ionicons name="people-outline" size={48} color={C.border} />
+            <Text style={styles.emptyTitle}>Aucun groupe</Text>
+            <Text style={styles.emptyText}>Crée un groupe ou rejoins-en un via la recherche</Text>
+            <TouchableOpacity style={styles.emptyBtn} onPress={() => navigation.navigate('CreateGroup')}>
+              <Text style={styles.emptyBtnText}>Créer un groupe</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <FlatList
+            data={myGroups}
+            renderItem={({ item }) => <GroupRow group={item} onPress={() => openGroup(item)} />}
+            keyExtractor={g => g.id}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingBottom: 20 }}
+            ItemSeparatorComponent={() => <View style={styles.sep} />}
+          />
+        )
       )}
     </SafeAreaView>
   );
@@ -329,53 +399,73 @@ export default function MessagesScreen() {
 
 const styles = StyleSheet.create({
   root:   { flex: 1, backgroundColor: C.bg },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 12, padding: 32 },
-  list:   { paddingBottom: 20 },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 10, padding: 32 },
 
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: PAD, paddingTop: 8, paddingBottom: 12,
+    paddingHorizontal: PAD, paddingTop: 10, paddingBottom: 10,
   },
-  title:      { fontSize: 17, fontWeight: '700', color: C.dark },
-  composeBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: C.border, justifyContent: 'center', alignItems: 'center' },
+  title:      { fontSize: 20, fontWeight: '700', color: C.dark, letterSpacing: -0.3 },
+  composeBtn: {
+    flexDirection: 'row', alignItems: 'flex-start',
+    width: 38, height: 38, borderRadius: 19,
+    backgroundColor: 'rgba(217,29,47,0.1)',
+    justifyContent: 'center', alignItems: 'center',
+  },
 
   // Search
-  searchWrap: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: PAD, paddingBottom: 10, gap: 10 },
+  searchWrap: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: PAD, paddingBottom: 10, gap: 8 },
   searchBar: {
     flex: 1, flexDirection: 'row', alignItems: 'center',
-    backgroundColor: C.inputBg, borderRadius: 12, paddingHorizontal: 12, height: 40,
+    backgroundColor: C.inputBg, borderRadius: 12, paddingHorizontal: 12, height: 38,
     borderWidth: 1.5, borderColor: 'transparent',
   },
-  searchBarFocused: { borderColor: C.accent },
+  searchBarFocused: { borderColor: C.accent, backgroundColor: C.bg },
   searchInput: { flex: 1, fontSize: 14, color: C.dark },
-  cancelBtn:  { paddingVertical: 4 },
-  cancelText: { color: C.accent, fontSize: 14, fontWeight: '600' },
+  cancelBtn:   { paddingVertical: 4 },
+  cancelText:  { color: C.accent, fontSize: 14, fontWeight: '600' },
 
   // Tabs
   tabs: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: C.border, marginHorizontal: PAD },
   tabItem: { flex: 1, alignItems: 'center', paddingVertical: 10, position: 'relative' },
-  tabLabel: { fontSize: 14, fontWeight: '500', color: C.muted },
+  tabLabel:       { fontSize: 14, fontWeight: '500', color: C.muted },
   tabLabelActive: { color: C.dark, fontWeight: '700' },
-  tabIndicator: { position: 'absolute', bottom: -1, left: '15%', right: '15%', height: 2.5, borderRadius: 2, backgroundColor: C.accent },
+  tabIndicator:   { position: 'absolute', bottom: -1, left: '15%', right: '15%', height: 2.5, borderRadius: 2, backgroundColor: C.accent },
 
-  // Row
-  row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: PAD, paddingVertical: 12, gap: 12 },
-  sep: { height: StyleSheet.hairlineWidth, backgroundColor: C.border, marginLeft: PAD + AVATAR_SIZE + 12 },
+  // Rows
+  row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: PAD, paddingVertical: 11, gap: 12 },
+  sep: { height: StyleSheet.hairlineWidth, backgroundColor: C.border, marginLeft: PAD + AVATAR + 12 },
 
-  avatar:        { width: AVATAR_SIZE, height: AVATAR_SIZE, borderRadius: AVATAR_SIZE / 2, backgroundColor: C.border },
-  avatarFallback:{ backgroundColor: '#1A1A1A', justifyContent: 'center', alignItems: 'center' },
-  avatarText:    { color: '#FFF', fontSize: 16, fontWeight: '700' },
+  avatar:            { width: AVATAR, height: AVATAR, borderRadius: AVATAR / 2, backgroundColor: C.border },
+  avatarFallback:    { backgroundColor: '#1A1A1A', justifyContent: 'center', alignItems: 'center' },
+  groupAvatarFallback: { backgroundColor: C.accent, justifyContent: 'center', alignItems: 'center' },
+  avatarText:        { color: '#FFF', fontSize: 17, fontWeight: '700' },
 
-  rowCenter:      { flex: 1, gap: 3 },
-  rowName:        { fontSize: 15, fontWeight: '500', color: C.dark },
-  rowLast:        { fontSize: 13, color: C.muted },
-  rowLastUnread:  { color: C.dark, fontWeight: '500' },
-  bold:           { fontWeight: '700' },
-  rowRight:       { alignItems: 'flex-end', gap: 6, minWidth: 44 },
-  rowTime:        { fontSize: 12, color: C.muted },
+  rowCenter:    { flex: 1, gap: 3 },
+  rowName:      { fontSize: 15, fontWeight: '500', color: C.dark },
+  bold:         { fontWeight: '700' },
+  rowSub:       { fontSize: 13, color: C.muted },
+  rowSubUnread: { color: C.dark, fontWeight: '500' },
+  rowRight:     { alignItems: 'flex-end', gap: 5, minWidth: 44 },
+  rowTime:      { fontSize: 11, color: C.muted },
+  memberCount:  { fontSize: 11, color: C.muted },
 
-  badge:     { minWidth: BADGE_SIZE, height: BADGE_SIZE, borderRadius: BADGE_SIZE / 2, backgroundColor: C.accent, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 5 },
+  groupNameRow: { flexDirection: 'row', alignItems: 'center', gap: 5, flexWrap: 'wrap' },
+  privateBadge: {
+    width: 16, height: 16, borderRadius: 8,
+    backgroundColor: 'rgba(217,29,47,0.1)',
+    justifyContent: 'center', alignItems: 'center',
+  },
+  adminBadge: {
+    backgroundColor: C.accent, borderRadius: 4,
+    paddingHorizontal: 5, paddingVertical: 1,
+  },
+  adminBadgeText: { fontSize: 9, color: '#FFF', fontWeight: '700' },
+
+  badge:     { minWidth: 20, height: 20, borderRadius: 10, backgroundColor: C.accent, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 5 },
   badgeText: { color: '#FFF', fontSize: 11, fontWeight: '700' },
+
+  sectionLabel: { fontSize: 11, fontWeight: '700', color: C.muted, paddingHorizontal: PAD, paddingTop: 14, paddingBottom: 4, letterSpacing: 0.5 },
 
   emptyTitle:   { fontSize: 16, fontWeight: '700', color: C.dark },
   emptyText:    { fontSize: 13, color: C.muted, textAlign: 'center' },
