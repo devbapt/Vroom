@@ -215,7 +215,7 @@ export default function CreatePostScreen() {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsMultipleSelection: true,
-      quality: 0.85,
+      quality: 1,
       selectionLimit: 6,
       base64: true,
     });
@@ -355,6 +355,7 @@ export default function CreatePostScreen() {
       <ScrollView
         contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 32 }]}
         keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
         showsVerticalScrollIndicator={false}
       >
         {/* ── Photo Picker ── */}
@@ -495,8 +496,7 @@ const styles = StyleSheet.create({
     borderBottomColor: C.border,
   },
   headerTitle: {
-
-    fontSize: 13,
+    fontSize: 15,
     letterSpacing: 2,
     color: C.white,
     fontWeight: '600',
@@ -508,8 +508,7 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
   },
   publishBtnText: {
-
-    fontSize: 11,
+    fontSize: 13,
     letterSpacing: 1.5,
     color: C.white,
     fontWeight: '700',
@@ -535,8 +534,7 @@ const styles = StyleSheet.create({
     backgroundColor: C.accent,
   },
   sectionTitleText: {
-
-    fontSize: 9,
+    fontSize: 12,
     letterSpacing: 2,
     color: C.whiteSoft,
     fontWeight: '600',
@@ -573,8 +571,7 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
   },
   mainBadgeText: {
-
-    fontSize: 7,
+    fontSize: 10,
     letterSpacing: 1,
     color: C.white,
     fontWeight: '700',
@@ -591,8 +588,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   addPhotoText: {
-
-    fontSize: 9,
+    fontSize: 12,
     letterSpacing: 0.5,
     color: C.whiteSoft,
     textAlign: 'center',
@@ -619,8 +615,7 @@ const styles = StyleSheet.create({
     backgroundColor: C.surfaceActive,
   },
   typeChipText: {
-
-    fontSize: 10,
+    fontSize: 12,
     letterSpacing: 1.5,
     color: C.whiteSoft,
     fontWeight: '600',
@@ -640,8 +635,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   fieldLabel: {
-
-    fontSize: 8,
+    fontSize: 11,
     letterSpacing: 1.5,
     color: C.whiteSoft,
     marginBottom: 5,
@@ -654,7 +648,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
     color: C.white,
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '500',
   },
   fieldInputMultiline: {
@@ -682,8 +676,7 @@ const styles = StyleSheet.create({
 
   // Char count
   charCount: {
-
-    fontSize: 9,
+    fontSize: 12,
     color: C.whiteFaint,
     textAlign: 'right',
     marginTop: 4,

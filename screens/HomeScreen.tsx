@@ -16,7 +16,6 @@ import { useAppContext } from '../context';
 import HomeHeader from '../components/cine/HomeHeader';
 import StoriesBar from '../components/cine/StoriesBar';
 import CineDrivePost from '../components/cine/CineDrivePost';
-import StoryViewer from './StoryViewer';
 import CommentsSheet from './CommentsSheet';
 import type { CineDrivePost as CineDrivePostData, AnyHUD } from '../context/AppContext';
 
@@ -57,17 +56,12 @@ function mapRowToPost(row: any, savedIds: Set<string>, likedIds: Set<string>): C
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
-  const { feedStories, markStoryAsViewed, removeFeedStory, user, toggleSaveCinePost, deletedPostIds } = useAppContext();
+  const { user, toggleSaveCinePost, deletedPostIds } = useAppContext();
 
   const [posts, setPosts] = useState<CineDrivePostData[]>([]);
   const [refreshing, setRefreshing] = useState(false);
-  const [storyViewerVisible, setStoryViewerVisible] = useState(false);
-  const [viewerHighlightId, setViewerHighlightId] = useState('');
-  const [viewerStories, setViewerStories] = useState<{ id: string; image: string; userId?: string }[]>([]);
   const [commentsPostId, setCommentsPostId] = useState('');
   const [commentsVisible, setCommentsVisible] = useState(false);
-
-  const myStory = feedStories.find(s => s.userId === (user?.id ?? ''));
 
   // Hauteur réelle du FlatList mesurée à l'exécution (pas d'approximation avec les insets)
   const [listHeight, setListHeight] = useState(
@@ -146,17 +140,6 @@ export default function HomeScreen() {
   const handleUserPress = useCallback((userId: string, username: string) => {
     navigation.navigate('UserProfile', { userId, username });
   }, [navigation]);
-
-  const handleMyStoryPress = useCallback(() => {
-    if (myStory) {
-      markStoryAsViewed(myStory.id);
-      setViewerHighlightId(myStory.id);
-      setViewerStories([{ id: myStory.id, image: myStory.imageUrl, userId: myStory.userId }]);
-      setStoryViewerVisible(true);
-    } else {
-      navigation.navigate('CreateStory');
-    }
-  }, [myStory, markStoryAsViewed, navigation]);
 
   const handleOpenComments = useCallback((postId: string) => {
     setCommentsPostId(postId);
@@ -239,24 +222,10 @@ export default function HomeScreen() {
       />
 
       {/* Header + StoriesBar flottants par-dessus le feed */}
-      <View style={[styles.headerOverlay, { paddingTop: insets.top }]} pointerEvents="box-none">
-        <HomeHeader
-          onAddPress={handleAddPress}
-          userAvatar={user?.avatar}
-          hasActiveStory={!!myStory}
-          onMyStoryPress={handleMyStoryPress}
-        />
+      <View style={styles.headerOverlay} pointerEvents="box-none">
+        <HomeHeader onAddPress={handleAddPress} topInset={insets.top} />
         <StoriesBar />
       </View>
-
-      <StoryViewer
-        visible={storyViewerVisible}
-        highlightId={viewerHighlightId}
-        onClose={() => setStoryViewerVisible(false)}
-        stories={viewerStories}
-        currentUserId={user?.id}
-        onStoryDelete={(id) => { removeFeedStory(id); setStoryViewerVisible(false); }}
-      />
 
       <CommentsSheet
         postId={commentsPostId}

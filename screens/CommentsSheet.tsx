@@ -9,11 +9,14 @@ import {
   TextInput,
   KeyboardAvoidingView,
   Platform,
+  Dimensions,
   Animated,
   Alert,
   ActivityIndicator,
   ListRenderItemInfo,
 } from 'react-native';
+
+const SCREEN_HEIGHT = Dimensions.get('window').height;
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image as ExpoImage } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
@@ -281,56 +284,58 @@ export default function CommentsSheet({ postId, visible, onClose, onCommentCount
   return (
     <Modal transparent animationType="none" visible={visible} onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose} />
-      <Animated.View
-        style={[
-          styles.sheet,
-          { paddingBottom: Math.max(insets.bottom, 12) },
-          { transform: [{ translateY: slideAnim }] },
-        ]}
+
+      {/* KAV enveloppe toute la feuille : elle monte au-dessus du clavier */}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.sheetWrapper}
       >
-        {/* Handle */}
-        <View style={styles.handle} />
+        <Animated.View
+          style={[styles.sheet, { transform: [{ translateY: slideAnim }] }]}
+        >
+          {/* Handle */}
+          <View style={styles.handle} />
 
-        {/* Header */}
-        <View style={styles.sheetHeader}>
-          <Text style={styles.sheetTitle}>Commentaires</Text>
-          <Pressable onPress={onClose} hitSlop={12}>
-            <Ionicons name="close" size={22} color={C.whiteSoft} />
-          </Pressable>
-        </View>
-
-        {/* Comments list */}
-        {loading ? (
-          <ActivityIndicator color={C.accent} style={{ marginTop: 32 }} />
-        ) : (
-          <FlatList
-            data={flatList}
-            keyExtractor={item => item.id}
-            renderItem={renderItem}
-            style={styles.list}
-            contentContainerStyle={styles.listContent}
-            showsVerticalScrollIndicator={false}
-            ListEmptyComponent={
-              <Text style={styles.emptyText}>Sois le premier à commenter !</Text>
-            }
-          />
-        )}
-
-        {/* Reply indicator */}
-        {replyTo && (
-          <View style={styles.replyIndicator}>
-            <Text style={styles.replyIndicatorText}>
-              Réponse à @{replyTo.profiles?.username ?? '—'}
-            </Text>
-            <Pressable onPress={() => setReplyTo(null)} hitSlop={8}>
-              <Ionicons name="close" size={14} color={C.whiteSoft} />
+          {/* Header */}
+          <View style={styles.sheetHeader}>
+            <Text style={styles.sheetTitle}>Commentaires</Text>
+            <Pressable onPress={onClose} hitSlop={12}>
+              <Ionicons name="close" size={22} color={C.whiteSoft} />
             </Pressable>
           </View>
-        )}
 
-        {/* Input */}
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-          <View style={styles.inputRow}>
+          {/* Comments list */}
+          {loading ? (
+            <ActivityIndicator color={C.accent} style={{ marginTop: 32 }} />
+          ) : (
+            <FlatList
+              data={flatList}
+              keyExtractor={item => item.id}
+              renderItem={renderItem}
+              style={styles.list}
+              contentContainerStyle={styles.listContent}
+              showsVerticalScrollIndicator={false}
+              keyboardDismissMode="on-drag"
+              ListEmptyComponent={
+                <Text style={styles.emptyText}>Sois le premier à commenter !</Text>
+              }
+            />
+          )}
+
+          {/* Reply indicator */}
+          {replyTo && (
+            <View style={styles.replyIndicator}>
+              <Text style={styles.replyIndicatorText}>
+                Réponse à @{replyTo.profiles?.username ?? '—'}
+              </Text>
+              <Pressable onPress={() => setReplyTo(null)} hitSlop={8}>
+                <Ionicons name="close" size={14} color={C.whiteSoft} />
+              </Pressable>
+            </View>
+          )}
+
+          {/* Input — paddingBottom gère la home indicator */}
+          <View style={[styles.inputRow, { paddingBottom: Math.max(insets.bottom, 12) }]}>
             <ExpoImage
               source={user?.avatar || undefined}
               style={styles.inputAvatar}
@@ -359,8 +364,8 @@ export default function CommentsSheet({ postId, visible, onClose, onCommentCount
               }
             </Pressable>
           </View>
-        </KeyboardAvoidingView>
-      </Animated.View>
+        </Animated.View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -370,12 +375,15 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
   },
-  sheet: {
+  // KAV positionné en bas — monte avec le clavier
+  sheetWrapper: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    maxHeight: '80%',
+  },
+  sheet: {
+    maxHeight: SCREEN_HEIGHT * 0.82,
     backgroundColor: C.bg,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,

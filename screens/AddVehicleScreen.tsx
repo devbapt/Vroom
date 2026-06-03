@@ -311,8 +311,9 @@ export default function AddVehicleScreen() {
       if (insertError) throw insertError;
 
       navigation.goBack();
-    } catch (_) {
-      Alert.alert('Erreur', 'Impossible d\'ajouter le véhicule.');
+    } catch (err: any) {
+      const msg = err?.message ?? JSON.stringify(err) ?? 'Erreur inconnue';
+      Alert.alert('Erreur', msg);
     } finally {
       setIsSubmitting(false);
     }
@@ -461,7 +462,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontFamily: MONO,
-    fontSize: 12,
+    fontSize: 15,
     letterSpacing: 2,
     color: C.white,
     fontWeight: '700',
@@ -482,7 +483,7 @@ const styles = StyleSheet.create({
   },
   sectionTitleText: {
     fontFamily: MONO,
-    fontSize: 9,
+    fontSize: 12,
     letterSpacing: 2,
     color: C.whiteSoft,
     fontWeight: '600',
@@ -532,7 +533,7 @@ const styles = StyleSheet.create({
   },
   photoPlaceholderHint: {
     fontFamily: MONO,
-    fontSize: 9,
+    fontSize: 12,
     color: C.whiteFaint,
     letterSpacing: 1,
   },
@@ -543,7 +544,7 @@ const styles = StyleSheet.create({
   fieldWrapper: { marginBottom: 10 },
   fieldLabel: {
     fontFamily: MONO,
-    fontSize: 8,
+    fontSize: 11,
     letterSpacing: 1.5,
     color: C.whiteSoft,
     marginBottom: 6,
@@ -605,7 +606,7 @@ const styles = StyleSheet.create({
   },
   chipText: {
     fontFamily: MONO,
-    fontSize: 10,
+    fontSize: 12,
     letterSpacing: 1,
     color: C.whiteSoft,
     fontWeight: '600',
@@ -614,7 +615,7 @@ const styles = StyleSheet.create({
 
   charCount: {
     fontFamily: MONO,
-    fontSize: 9,
+    fontSize: 12,
     color: C.whiteFaint,
     textAlign: 'right',
     marginTop: 4,
@@ -637,14 +638,14 @@ const styles = StyleSheet.create({
   },
   submitBtnText: {
     fontFamily: MONO,
-    fontSize: 13,
+    fontSize: 15,
     letterSpacing: 2,
     color: C.white,
     fontWeight: '700',
   },
   validationHint: {
     fontFamily: MONO,
-    fontSize: 9,
+    fontSize: 12,
     color: C.whiteFaint,
     textAlign: 'center',
     marginTop: 8,
