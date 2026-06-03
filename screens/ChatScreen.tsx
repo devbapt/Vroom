@@ -454,7 +454,7 @@ const styles = StyleSheet.create({
   avatarText:     { color: '#FFF', fontSize: 12, fontWeight: '700' },
 
   loader: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  list:   { paddingHorizontal: 12, paddingVertical: 20, gap: 3, flexGrow: 1, justifyContent: 'flex-end' },
+  list:   { paddingHorizontal: 12, paddingVertical: 12, gap: 3, flexGrow: 1 },
 
   // Empty chat state
   emptyChat: {
