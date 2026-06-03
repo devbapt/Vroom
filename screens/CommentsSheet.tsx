@@ -31,7 +31,6 @@ const C = {
   inputBg: 'rgba(255,255,255,0.07)',
 };
 
-const MONO = 'Courier';
 
 type Comment = {
   id: string;
@@ -195,7 +194,13 @@ export default function CommentsSheet({ postId, visible, onClose, onCommentCount
       .single();
 
     if (!error && data) {
-      setComments(prev => [...prev, { ...data, isLiked: false }]);
+      const newComment: Comment = {
+        ...data,
+        profiles: Array.isArray(data.profiles) ? data.profiles[0] : data.profiles,
+        isLiked: false,
+        isSaved: false,
+      };
+      setComments(prev => [...prev, newComment]);
       onCommentCountChange?.(1);
     }
     setText('');
@@ -410,7 +415,6 @@ const styles = StyleSheet.create({
     gap: 0,
   },
   emptyText: {
-    fontFamily: MONO,
     fontSize: 12,
     color: C.whiteFaint,
     textAlign: 'center',
@@ -451,7 +455,6 @@ const styles = StyleSheet.create({
     color: C.white,
   },
   commentTime: {
-    fontFamily: MONO,
     fontSize: 10,
     color: C.whiteFaint,
   },
@@ -467,7 +470,6 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   replyBtn: {
-    fontFamily: MONO,
     fontSize: 10,
     letterSpacing: 0.5,
     color: C.whiteFaint,
@@ -507,7 +509,6 @@ const styles = StyleSheet.create({
     borderTopColor: C.border,
   },
   replyIndicatorText: {
-    fontFamily: MONO,
     fontSize: 10,
     color: C.whiteSoft,
     letterSpacing: 0.5,

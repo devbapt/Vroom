@@ -8,6 +8,8 @@ import { useAppContext } from '../context/AppContext';
 import LoginScreen from '../screens/LoginScreen';
 import SignupScreen from '../screens/SignupScreen';
 import WelcomeScreen from '../screens/WelcomeScreen';
+import ForgotPasswordScreen from '../screens/ForgotPasswordScreen';
+import ChangePasswordScreen from '../screens/ChangePasswordScreen';
 import MainNavigator from './MainNavigator';
 
 const Stack = createStackNavigator();
@@ -18,6 +20,7 @@ function AuthNavigator() {
     <AuthStack.Navigator screenOptions={{ headerShown: false }}>
       <AuthStack.Screen name="Login" component={LoginScreen} />
       <AuthStack.Screen name="Signup" component={SignupScreen} />
+      <AuthStack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
     </AuthStack.Navigator>
   );
 }
@@ -26,6 +29,7 @@ export default function AppNavigator() {
   const { showWelcome } = useAppContext();
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [isRecovery, setIsRecovery] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -33,9 +37,13 @@ export default function AppNavigator() {
       setLoading(false);
     });
 
-    // 2. Écoute les changements (quand tu cliques sur "Se connecter")
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session);
+      if (event === 'PASSWORD_RECOVERY') {
+        setIsRecovery(true);
+      } else if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') {
+        setIsRecovery(false);
+      }
     });
 
     return () => subscription.unsubscribe();
@@ -53,7 +61,10 @@ export default function AppNavigator() {
   return (
     <NavigationContainer>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
-        {session && session.user ? (
+        {isRecovery ? (
+          // RESET PASSWORD ➡️ lien email cliqué → changer le mot de passe
+          <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} />
+        ) : session && session.user ? (
           showWelcome ? (
             // NOUVEL INSCRIT ➡️ Écran de bienvenue 2.5s puis MainApp
             <Stack.Screen name="Welcome" component={WelcomeScreen} />

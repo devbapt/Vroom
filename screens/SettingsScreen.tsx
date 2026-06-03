@@ -108,6 +108,7 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
 
             <Pressable
               style={({ pressed }) => [styles.settingRow, pressed && { backgroundColor: VROOM_COLORS.fieldBg }]}
+              onPress={() => navigation.navigate('ChangePassword')}
             >
               <View style={styles.settingInfo}>
                 <Text style={styles.settingLabel}>{t.settings.change_password}</Text>

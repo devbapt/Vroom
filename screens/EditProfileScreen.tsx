@@ -10,6 +10,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { Image as ExpoImage } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
@@ -82,14 +83,23 @@ export default function EditProfileScreen({ navigation }: EditProfileScreenProps
 
   const handleSave = async () => {
     if (!user?.id) return;
+
+    const trimmedUsername = username.trim().toLowerCase();
+    if (!trimmedUsername) {
+      Platform.OS === 'web'
+        ? alert("Le nom d'utilisateur est obligatoire.")
+        : Alert.alert('Champ requis', "Le nom d'utilisateur est obligatoire.");
+      return;
+    }
+
     setIsSaving(true);
     try {
       let finalAvatarUrl = user?.avatar ?? '';
 
-      const isNewAvatar = avatarBase64 !== null;
-      if (isNewAvatar) {
+      // — Upload avatar if changed
+      if (avatarBase64 !== null) {
         const filePath = `${user.id}/avatar.jpg`;
-        const binaryStr = atob(avatarBase64!);
+        const binaryStr = atob(avatarBase64);
         const bytes = new Uint8Array(binaryStr.length);
         for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);
 
@@ -101,25 +111,35 @@ export default function EditProfileScreen({ navigation }: EditProfileScreenProps
           const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(filePath);
           finalAvatarUrl = `${urlData.publicUrl}?v=${Date.now()}`;
         } else {
-          console.error('EditProfile avatar upload error:', uploadError.message);
+          console.error('Avatar upload error:', uploadError.message);
         }
       } else if (avatarUri.startsWith('http')) {
         finalAvatarUrl = avatarUri;
       }
 
-      await supabase
+      // — Upsert profile (handles both existing and missing profile rows)
+      const { error: dbError } = await supabase
         .from('profiles')
-        .update({
+        .upsert({
+          id: user.id,
           full_name: name.trim(),
-          username: username.trim().toLowerCase(),
+          username: trimmedUsername,
           bio: bio.trim(),
           avatar_url: finalAvatarUrl || null,
-        })
-        .eq('id', user.id);
+        });
+
+      if (dbError) {
+        console.error('Profile upsert error:', dbError.message);
+        const msg = dbError.message.includes('unique')
+          ? "Ce nom d'utilisateur est déjà pris."
+          : `Erreur : ${dbError.message}`;
+        Platform.OS === 'web' ? alert(msg) : Alert.alert('Erreur', msg);
+        return;
+      }
 
       updateProfile({
         displayName: name.trim(),
-        username: username.trim().toLowerCase(),
+        username: trimmedUsername,
         bio: bio.trim(),
         avatar: finalAvatarUrl,
         tags,

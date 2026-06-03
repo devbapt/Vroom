@@ -8,6 +8,7 @@ import ActivityScreen from '../screens/ActivityScreen';
 import SavedScreen from '../screens/SavedScreen';
 import CreateStoryScreen from '../screens/CreateStoryScreen';
 import CreatePostScreen from '../screens/CreatePostScreen';
+import ChangePasswordScreen from '../screens/ChangePasswordScreen';
 
 const Stack = createStackNavigator();
 
@@ -19,13 +20,14 @@ export default function ProfileStackNavigator() {
         component={ProfileScreen}
         options={{ gestureEnabled: false }}
       />
-      <Stack.Screen name="EditProfile"   component={EditProfileScreen} />
-      <Stack.Screen name="AddVehicle"    component={AddVehicleScreen} />
-      <Stack.Screen name="Settings"      component={SettingsScreen} />
-      <Stack.Screen name="Activity"      component={ActivityScreen} />
-      <Stack.Screen name="Saved"         component={SavedScreen} />
-      <Stack.Screen name="CreateStory"   component={CreateStoryScreen} />
-      <Stack.Screen name="CreatePost"    component={CreatePostScreen} />
+      <Stack.Screen name="EditProfile"      component={EditProfileScreen} />
+      <Stack.Screen name="AddVehicle"       component={AddVehicleScreen} />
+      <Stack.Screen name="Settings"         component={SettingsScreen} />
+      <Stack.Screen name="Activity"         component={ActivityScreen} />
+      <Stack.Screen name="Saved"            component={SavedScreen} />
+      <Stack.Screen name="CreateStory"      component={CreateStoryScreen} />
+      <Stack.Screen name="CreatePost"       component={CreatePostScreen} />
+      <Stack.Screen name="ChangePassword"   component={ChangePasswordScreen} />
     </Stack.Navigator>
   );
 }

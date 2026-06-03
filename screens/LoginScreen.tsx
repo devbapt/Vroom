@@ -149,7 +149,10 @@ export default function LoginScreen({ navigation }: { navigation: any }) {
             </Pressable>
           </View>
 
-          <Pressable style={({ hovered }: any) => [hovered && { opacity: 0.7 }]}>
+          <Pressable
+            onPress={() => navigation.navigate('ForgotPassword')}
+            style={({ hovered }: any) => [hovered && { opacity: 0.7 }]}
+          >
             <Text style={styles.forgotPassword}>Mot de passe oublié ?</Text>
           </Pressable>
 

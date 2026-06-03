@@ -9,34 +9,35 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
+import { useAppContext } from '../../context/AppContext';
+import { useUnreadCount } from '../../hooks/useMessages';
 
 const ACCENT = '#E50914';
 const TAB_HEIGHT = 60;
 
 const ICON_MAP: Record<string, { default: string; focused: string }> = {
-  Home:     { default: 'home-outline',        focused: 'home' },
-  Maps:     { default: 'map-outline',         focused: 'map' },
-  Search:   { default: 'search-outline',      focused: 'search' },
-  Messages: { default: 'chatbubble-outline',  focused: 'chatbubble' },
-  Profile:  { default: 'person-outline',      focused: 'person' },
+  Home:     { default: 'home-outline',       focused: 'home' },
+  Maps:     { default: 'map-outline',        focused: 'map' },
+  Search:   { default: 'search-outline',     focused: 'search' },
+  Messages: { default: 'chatbubble-outline', focused: 'chatbubble' },
+  Profile:  { default: 'person-outline',     focused: 'person' },
 };
 
 const LABEL_MAP: Record<string, string> = {
-  Home: 'Home',
-  Maps: 'Maps',
-  Search: 'Search',
-  Messages: 'Messages',
-  Profile: 'Profile',
+  Home: 'Home', Maps: 'Maps', Search: 'Search', Messages: 'Messages', Profile: 'Profile',
 };
 
 function CustomTabBar({ state, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
+  const { user } = useAppContext();
+  const unreadCount = useUnreadCount(user?.id ?? '');
+
   const activeRouteName = state.routes[state.index]?.name ?? '';
   const isDark = activeRouteName === 'Home';
 
-  const bgColor        = isDark ? '#140102' : '#FFFFFF';
-  const borderColor    = isDark ? 'rgba(255,255,255,0.08)' : '#EEEEEE';
-  const inactiveColor  = isDark ? 'rgba(255,255,255,0.45)' : '#8E8E93';
+  const bgColor       = isDark ? '#140102' : '#FFFFFF';
+  const borderColor   = isDark ? 'rgba(255,255,255,0.08)' : '#EEEEEE';
+  const inactiveColor = isDark ? 'rgba(255,255,255,0.45)' : '#8E8E93';
 
   return (
     <View
@@ -52,16 +53,16 @@ function CustomTabBar({ state, navigation }: BottomTabBarProps) {
     >
       {state.routes.map((route, index) => {
         const isFocused = state.index === index;
-        const icons = ICON_MAP[route.name] ?? { default: 'ellipse-outline', focused: 'ellipse' };
-        const label = LABEL_MAP[route.name] ?? route.name;
-        const iconName = (isFocused ? icons.focused : icons.default) as keyof typeof Ionicons.glyphMap;
+        const icons     = ICON_MAP[route.name] ?? { default: 'ellipse-outline', focused: 'ellipse' };
+        const label     = LABEL_MAP[route.name] ?? route.name;
+        const iconName  = (isFocused ? icons.focused : icons.default) as keyof typeof Ionicons.glyphMap;
         const iconColor = isFocused ? ACCENT : inactiveColor;
+        const isMessages = route.name === 'Messages';
+        const badgeCount = isMessages ? unreadCount : 0;
 
         const onPress = () => {
           const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
-          if (!isFocused && !event.defaultPrevented) {
-            navigation.navigate(route.name);
-          }
+          if (!isFocused && !event.defaultPrevented) navigation.navigate(route.name);
         };
 
         return (
@@ -74,6 +75,11 @@ function CustomTabBar({ state, navigation }: BottomTabBarProps) {
           >
             <View style={styles.iconWrapper}>
               <Ionicons name={iconName} size={22} color={iconColor} />
+              {badgeCount > 0 && (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>{badgeCount > 99 ? '99+' : badgeCount}</Text>
+                </View>
+              )}
             </View>
             <Text style={[styles.label, { color: iconColor }]}>{label}</Text>
           </Pressable>
@@ -100,10 +106,28 @@ const styles = StyleSheet.create({
   },
   iconWrapper: {
     alignItems: 'center',
+    position: 'relative',
   },
   label: {
     fontSize: 10,
     fontWeight: '600',
     marginTop: 1,
+  },
+  badge: {
+    position: 'absolute',
+    top: -5,
+    right: -10,
+    minWidth: 17,
+    height: 17,
+    borderRadius: 9,
+    backgroundColor: ACCENT,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 3,
+  },
+  badgeText: {
+    color: '#FFF',
+    fontSize: 10,
+    fontWeight: '700',
   },
 });
