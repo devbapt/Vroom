@@ -31,15 +31,17 @@ type ChatRouteParams = {
 // ─── Design tokens ────────────────────────────────────────────────────────────
 
 const C = {
-  bg:         '#FFFFFF',
-  chatBg:     '#F2F2F7',   // iOS system gray 6 — chat area background
-  dark:       '#121212',
-  accent:     '#D91D2F',
-  muted:      '#8E8E93',
-  border:     '#E8E8E8',
-  bubbleMe:   '#D91D2F',
-  bubbleThem: '#FFFFFF',   // white with shadow → more premium than grey
-  inputBg:    '#F7F7F7',
+  bg:         '#140102',
+  chatBg:     '#0D0001',
+  dark:       '#140102',
+  accent:     '#E50914',
+  muted:      'rgba(255,255,255,0.45)',
+  border:     'rgba(255,255,255,0.12)',
+  bubbleMe:   '#E50914',
+  bubbleThem: '#1F0808',
+  inputBg:    '#1F0808',
+  white:      '#FFFFFF',
+  whiteSoft:  'rgba(255,255,255,0.75)',
 };
 
 // ─── Action menu items ────────────────────────────────────────────────────────
@@ -314,7 +316,7 @@ export default function ChatScreen() {
   const plusRotate = rotateAnim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '45deg'] });
 
   return (
-    <SafeAreaView style={styles.root} edges={['top', 'bottom']}>
+    <SafeAreaView style={styles.root} edges={['top']}>
       {/* ── Header ── */}
       <View style={styles.header}>
         <Pressable onPress={() => navigation.goBack()} hitSlop={12} style={styles.backBtn}>
@@ -322,18 +324,12 @@ export default function ChatScreen() {
         </Pressable>
 
         <Pressable style={styles.headerCenter} onPress={() => {}}>
-          <View style={styles.headerAvatarWrap}>
-            <UserAvatar user={otherUser} size={38} />
-            <View style={styles.onlineDot} />
-          </View>
-          <View>
-            <Text style={styles.headerName} numberOfLines={1}>@{otherUser.username}</Text>
-            <Text style={styles.headerStatus}>En ligne</Text>
-          </View>
+          <UserAvatar user={otherUser} size={38} />
+          <Text style={styles.headerName} numberOfLines={1}>@{otherUser.username}</Text>
         </Pressable>
 
         <Pressable hitSlop={12} style={styles.headerRight}>
-          <Ionicons name="call-outline" size={20} color={C.dark} />
+          <Ionicons name="call-outline" size={20} color={C.muted} />
         </Pressable>
       </View>
 
@@ -423,14 +419,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 10,
     backgroundColor: C.bg,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomWidth: 0.5,
     borderBottomColor: C.border,
     gap: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    elevation: 2,
   },
   backBtn: { padding: 6 },
   headerCenter: {
@@ -440,15 +431,7 @@ const styles = StyleSheet.create({
     gap: 10,
     paddingHorizontal: 4,
   },
-  headerAvatarWrap: { position: 'relative' },
-  onlineDot: {
-    position: 'absolute', bottom: 0, right: 0,
-    width: 10, height: 10, borderRadius: 5,
-    backgroundColor: '#34C759',
-    borderWidth: 1.5, borderColor: C.bg,
-  },
-  headerName:   { fontSize: 15, fontWeight: '700', color: C.dark },
-  headerStatus: { fontSize: 11, color: '#34C759', fontWeight: '500' },
+  headerName: { fontSize: 15, fontWeight: '700', color: C.white },
   headerRight:  { padding: 6 },
   avatarFallback: { backgroundColor: C.accent, justifyContent: 'center', alignItems: 'center' },
   avatarText:     { color: '#FFF', fontSize: 12, fontWeight: '700' },
@@ -461,7 +444,7 @@ const styles = StyleSheet.create({
     flex: 1, alignItems: 'center', justifyContent: 'center',
     paddingVertical: 80, gap: 12,
   },
-  emptyChatName: { fontSize: 17, fontWeight: '700', color: C.dark },
+  emptyChatName: { fontSize: 17, fontWeight: '700', color: C.white },
   emptyChatHint: { fontSize: 13, color: C.muted },
 
   // Bubbles
@@ -502,15 +485,13 @@ const styles = StyleSheet.create({
   bubbleDeleted: { opacity: 0.45 },
   bubbleText:        { fontSize: 15, lineHeight: 21 },
   bubbleTextMe:      { color: '#FFF' },
-  bubbleTextThem:    { color: C.dark },
+  bubbleTextThem:    { color: C.whiteSoft },
   bubbleTextDeleted: { fontStyle: 'italic' },
   likeTag: {
     position: 'absolute', bottom: -11,
-    backgroundColor: C.bg,
+    backgroundColor: '#2A0A0A',
     borderRadius: 12, paddingHorizontal: 4, paddingVertical: 2,
-    borderWidth: 1, borderColor: C.border,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08, shadowRadius: 3, elevation: 2,
+    borderWidth: 0.5, borderColor: C.border,
   },
   likeTagMe:   { right: 8 },
   likeTagThem: { left: 8 },
@@ -528,29 +509,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 16,
     backgroundColor: C.bg,
-    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopWidth: 0.5,
     borderTopColor: C.border,
   },
   actionItem:   { alignItems: 'center', gap: 8 },
   actionCircle: {
-    width: 56, height: 56, borderRadius: 28,
+    width: 52, height: 52, borderRadius: 26,
     justifyContent: 'center', alignItems: 'center',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15, shadowRadius: 6, elevation: 3,
   },
-  actionLabel:  { fontSize: 11, color: C.dark, fontWeight: '500' },
+  actionLabel:  { fontSize: 11, color: C.muted, fontWeight: '500' },
 
   // Input bar
   inputBar: {
     flexDirection: 'row', alignItems: 'flex-end',
-    paddingHorizontal: 10, paddingVertical: 10, gap: 8,
+    paddingHorizontal: 10, paddingVertical: 10, paddingBottom: 16, gap: 8,
     backgroundColor: C.bg,
-    borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: C.border,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 4,
+    borderTopWidth: 0.5, borderTopColor: C.border,
   },
   plusBtn: {
     width: 34, height: 34, borderRadius: 17,
@@ -568,7 +542,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: C.border,
   },
-  input: { fontSize: 15, color: C.dark, maxHeight: 120 },
+  input: { fontSize: 15, color: C.white, maxHeight: 120 },
   sendBtn: {
     width: 38, height: 38, borderRadius: 19,
     backgroundColor: C.accent,

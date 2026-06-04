@@ -24,8 +24,6 @@ import { supabase } from '../supabaseClient';
 import { useAppContext } from '../context/AppContext';
 import { getTranslation } from '../i18n';
 import type { ProfileTag } from '../context/AppContext';
-import PostDetailModal from './PostDetailModal';
-import CommentsSheet from './CommentsSheet';
 
 const { width } = Dimensions.get('window');
 
@@ -238,7 +236,7 @@ export default function ProfileScreen() {
           onCarPress={(id) => setSelectedCarId(id)}
           onOpenMenu={openMenu}
           onOpenAddSheet={openAddSheet}
-          onNavigate={(screen) => navigation.navigate(screen)}
+          onNavigate={(screen, params) => navigation.navigate(screen, params)}
           onShareProfile={handleShareProfile}
           onRefresh={onRefresh}
           refreshing={refreshing}
@@ -365,7 +363,7 @@ function ProfileGridView({
   onCarPress: (id: string) => void;
   onOpenMenu: () => void;
   onOpenAddSheet: () => void;
-  onNavigate: (screen: string) => void;
+  onNavigate: (screen: string, params?: Record<string, any>) => void;
   onShareProfile: () => void;
   onRefresh: () => void;
   refreshing: boolean;
@@ -390,9 +388,6 @@ function ProfileGridView({
   const followersCount = user?.followersCount ?? 0;
 
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
-  const [selectedPost, setSelectedPost] = useState<{
-    id: string; name: string; image: string; description?: string; date?: string;
-  } | null>(null);
 
   const formatCount = (n: number) => n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n);
 
@@ -575,7 +570,7 @@ function ProfileGridView({
                     if (pendingDeleteId === post.id) {
                       setPendingDeleteId(null);
                     } else {
-                      setSelectedPost({
+                      onNavigate('PostDetail', {
                         id: post.id,
                         name: [post.brand, post.model].filter(Boolean).join(' ') || post.type || 'Publication',
                         image: post.image_urls?.[0] ?? '',
@@ -650,11 +645,6 @@ function ProfileGridView({
         )}
       </ScrollView>
 
-      <PostDetailModal
-        visible={selectedPost !== null}
-        post={selectedPost}
-        onClose={() => setSelectedPost(null)}
-      />
     </SafeAreaView>
   );
 }

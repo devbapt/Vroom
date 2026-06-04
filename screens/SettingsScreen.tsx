@@ -25,7 +25,7 @@ const VROOM_COLORS = {
 
 const CONTAINER_PADDING = 16;
 
-type SettingsScreenProps = { navigation: any };
+type SettingsScreenProps = { navigation: any; };
 
 export default function SettingsScreen({ navigation }: SettingsScreenProps) {
   const [pushNotifications, setPushNotifications] = useState(true);
@@ -154,16 +154,17 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
           </View>
         </View>
 
-        {/* === AIDE === */}
+        {/* === AIDE & LÉGAL === */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>{t.settings.help_section}</Text>
           <View style={styles.sectionContent}>
             <Pressable
               style={({ pressed }) => [styles.settingRow, pressed && { backgroundColor: VROOM_COLORS.fieldBg }]}
+              onPress={() => navigation.navigate('About')}
             >
               <View style={styles.settingInfo}>
                 <Text style={styles.settingLabel}>{t.settings.about}</Text>
-                <Text style={styles.settingHint}>{t.settings.version}</Text>
+                <Text style={styles.settingHint}>Version de l'application, contact</Text>
               </View>
               <Ionicons name="chevron-forward" size={18} color={VROOM_COLORS.muted} />
             </Pressable>
@@ -172,10 +173,11 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
 
             <Pressable
               style={({ pressed }) => [styles.settingRow, pressed && { backgroundColor: VROOM_COLORS.fieldBg }]}
+              onPress={() => navigation.navigate('Legal')}
             >
               <View style={styles.settingInfo}>
-                <Text style={styles.settingLabel}>{t.settings.support}</Text>
-                <Text style={styles.settingHint}>{t.settings.support_hint}</Text>
+                <Text style={styles.settingLabel}>Informations légales</Text>
+                <Text style={styles.settingHint}>Mentions légales, CGU, confidentialité</Text>
               </View>
               <Ionicons name="chevron-forward" size={18} color={VROOM_COLORS.muted} />
             </Pressable>
@@ -184,10 +186,11 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
 
             <Pressable
               style={({ pressed }) => [styles.settingRow, pressed && { backgroundColor: VROOM_COLORS.fieldBg }]}
+              onPress={() => navigation.navigate('Legal')}
             >
               <View style={styles.settingInfo}>
-                <Text style={styles.settingLabel}>{t.settings.terms}</Text>
-                <Text style={styles.settingHint}>{t.settings.terms_hint}</Text>
+                <Text style={styles.settingLabel}>Mes données personnelles</Text>
+                <Text style={styles.settingHint}>RGPD, droits d'accès et de suppression</Text>
               </View>
               <Ionicons name="chevron-forward" size={18} color={VROOM_COLORS.muted} />
             </Pressable>

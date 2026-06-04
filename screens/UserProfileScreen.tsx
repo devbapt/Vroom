@@ -20,7 +20,6 @@ import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { supabase } from '../supabaseClient';
 import { useAppContext } from '../context';
 import type { HomeStackParamList } from '../navigation/HomeStackNavigator';
-import PostDetailModal from './PostDetailModal';
 
 const { width } = Dimensions.get('window');
 
@@ -84,9 +83,6 @@ export default function UserProfileScreen() {
   const [followersCount, setFollowersCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'garage' | 'publications' | 'itineraires'>('publications');
-  const [selectedPost, setSelectedPost] = useState<{
-    id: string; name: string; image: string; description?: string; date?: string;
-  } | null>(null);
 
   const canFollow = !!user?.id && user.id !== userId;
 
@@ -372,7 +368,7 @@ export default function UserProfileScreen() {
                   key={post.id}
                   style={styles.card}
                   onPress={() =>
-                    setSelectedPost({
+                    navigation.navigate('PostDetail', {
                       id: post.id,
                       name: post.type ?? 'Publication',
                       image: post.image_urls?.[0] ?? '',
@@ -412,11 +408,6 @@ export default function UserProfileScreen() {
         )}
       </ScrollView>
 
-      <PostDetailModal
-        visible={selectedPost !== null}
-        post={selectedPost}
-        onClose={() => setSelectedPost(null)}
-      />
     </SafeAreaView>
   );
 }
