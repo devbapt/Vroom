@@ -1,12 +1,14 @@
 import React from 'react';
-import { View, Text, StyleSheet, Pressable, SafeAreaView } from 'react-native';
+import { View, Text, StyleSheet, Pressable } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
 const COLORS_LIGHT = {
-  bg: '#FFFFFF', 
-  text: '#140102', 
-  accent: '#E50914', 
-  border: '#EEEEEE',
+  bg:     '#140102',
+  text:   '#FFFFFF',
+  accent: '#E50914',
+  border: 'rgba(255,255,255,0.12)',
+  muted:  'rgba(255,255,255,0.45)',
 };
 
 export default function GarageScreen() {
@@ -40,7 +42,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, padding: 20, justifyContent: 'space-between' },
   emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   emptyText: { fontSize: 18, fontWeight: 'bold', color: COLORS_LIGHT.text, marginBottom: 5 },
-  emptySubText: { fontSize: 15, color: '#666666', textAlign: 'center' },
+  emptySubText: { fontSize: 15, color: COLORS_LIGHT.muted, textAlign: 'center' },
   addButton: { backgroundColor: COLORS_LIGHT.accent, height: 55, borderRadius: 10, justifyContent: 'center', alignItems: 'center' },
   addButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: 'bold' },
 });

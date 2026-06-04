@@ -369,47 +369,24 @@ export default function AddVehicleScreen() {
         <BrandInput value={brand} onChangeText={setBrand} />
 
         <View style={styles.row}>
-          <View style={{ flex: 3 }}>
+          <View style={{ flex: 1 }}>
             <Field label={t.model} value={model} onChangeText={setModel} placeholder="911 GT3 RS" />
           </View>
-          <View style={{ flex: 1 }}>
+          <View style={{ minWidth: 80 }}>
             <Field label={t.year} value={year} onChangeText={setYear} placeholder="2024" keyboardType="numeric" />
           </View>
         </View>
 
         <Field label={t.nickname} value={nickname} onChangeText={setNickname} placeholder="La rouge, Ma daily…" />
 
-        {/* ── Techniques ── */}
-        <SectionTitle label={t.technical} />
+        {/* ── Performance (optionnel) ── */}
+        <SectionTitle label="PERFORMANCE (optionnel)" />
 
         <View style={styles.row}>
           <View style={{ flex: 1 }}>
-            <Field label={t.power} value={power} onChangeText={setPower} placeholder="525hp" mono />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Field label={t.acceleration} value={acceleration} onChangeText={setAcceleration} placeholder="3.2s" mono />
+            <Field label="0 — 100 (s)" value={acceleration} onChangeText={setAcceleration} placeholder="3.2s" mono />
           </View>
         </View>
-
-        <ChipSelector label={t.transmission} options={TRANSMISSION_OPTIONS} value={transmission} onChange={setTransmission} />
-        <ChipSelector label={t.drivetrain}    options={DRIVETRAIN_OPTIONS}   value={drivetrain}   onChange={setDrivetrain} />
-        <ChipSelector label={t.fuel}          options={FUEL_OPTIONS}         value={fuel}         onChange={setFuel} />
-
-        {/* ── Détails ── */}
-        <SectionTitle label={t.details} />
-
-        <View style={styles.row}>
-          <View style={{ flex: 1 }}>
-            <Field label={t.color}   value={color}   onChangeText={setColor}   placeholder="Argent" />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Field label={t.mileage} value={mileage} onChangeText={setMileage} placeholder="24 800" keyboardType="numeric" mono />
-          </View>
-        </View>
-
-        <Field label={t.acquiredAt} value={acquiredAt} onChangeText={setAcquiredAt} placeholder="MM/YYYY" />
-
-        <ChipSelector label={t.status} options={STATUS_OPTIONS} value={status} onChange={setStatus} />
 
         {/* ── Notes ── */}
         <SectionTitle label={t.notes} />

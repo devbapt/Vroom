@@ -6,10 +6,10 @@ import {
   Modal,
   Pressable,
   Dimensions,
-  SafeAreaView,
   Animated,
   Alert,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image as ExpoImage } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../supabaseClient';
@@ -18,12 +18,13 @@ const { width, height } = Dimensions.get('window');
 
 // --- Colors ---
 const VROOM_COLORS = {
-  bg: '#FFFFFF',
-  dark: '#140102',
-  accent: '#E50914',
-  muted: '#8E8E93',
-  fieldBg: 'rgba(20, 1, 2, 0.05)',
-  border: '#EEEEEE',
+  bg:      '#140102',
+  dark:    '#140102',
+  accent:  '#E50914',
+  muted:   'rgba(255,255,255,0.45)',
+  fieldBg: '#1F0808',
+  border:  'rgba(255,255,255,0.12)',
+  white:   '#FFFFFF',
 };
 
 const FALLBACK_IMAGE = require('../assets/logo_vroom_Couleur.png');

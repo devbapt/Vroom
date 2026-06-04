@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   Pressable,
-  SafeAreaView,
   ScrollView,
   TextInput,
   KeyboardAvoidingView,
@@ -12,6 +11,7 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image as ExpoImage } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -21,12 +21,14 @@ import type { ProfileTag } from '../context/AppContext';
 import { getTranslation } from '../i18n';
 
 const VROOM_COLORS = {
-  bg: '#FFFFFF',
-  dark: '#140102',
-  accent: '#E50914',
-  muted: '#8E8E93',
-  fieldBg: 'rgba(20, 1, 2, 0.05)',
-  border: '#EEEEEE',
+  bg:       '#140102',
+  dark:     '#140102',
+  accent:   '#E50914',
+  muted:    'rgba(255,255,255,0.45)',
+  fieldBg:  '#1F0808',
+  border:   'rgba(255,255,255,0.12)',
+  white:    '#FFFFFF',
+  whiteSoft:'rgba(255,255,255,0.7)',
 };
 
 const CONTAINER_PADDING = 16;
@@ -167,7 +169,7 @@ export default function EditProfileScreen({ navigation }: EditProfileScreenProps
       {/* Header */}
       <View style={styles.header}>
         <Pressable onPress={() => navigation.goBack()} hitSlop={15}>
-          <Ionicons name="chevron-down" size={30} color={VROOM_COLORS.dark} />
+          <Ionicons name="chevron-down" size={30} color={VROOM_COLORS.white} />
         </Pressable>
         <Text style={styles.headerTitle}>Modifier le profil</Text>
         <Pressable
@@ -280,7 +282,7 @@ export default function EditProfileScreen({ navigation }: EditProfileScreenProps
                       <Ionicons
                         name="close"
                         size={13}
-                        color={tag.type === 'brand' ? '#FFFFFF' : VROOM_COLORS.dark}
+                        color={tag.type === 'brand' ? '#FFFFFF' : VROOM_COLORS.whiteSoft}
                       />
                     </Pressable>
                   </View>
@@ -348,7 +350,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 0.5,
     borderBottomColor: VROOM_COLORS.border,
   },
-  headerTitle: { fontSize: 15, fontWeight: '600', color: VROOM_COLORS.dark },
+  headerTitle: { fontSize: 15, fontWeight: '600', color: VROOM_COLORS.white },
   saveBtn: { paddingHorizontal: 12, paddingVertical: 6 },
   saveBtnText: { fontSize: 14, fontWeight: '600', color: VROOM_COLORS.accent },
   scrollContent: { paddingHorizontal: CONTAINER_PADDING, paddingVertical: 20 },
@@ -377,7 +379,7 @@ const styles = StyleSheet.create({
   fieldLabel: {
     fontSize: 12,
     fontWeight: '600',
-    color: VROOM_COLORS.dark,
+    color: VROOM_COLORS.muted,
     marginBottom: 7,
     letterSpacing: 0.3,
   },
@@ -389,7 +391,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 11,
     fontSize: 14,
-    color: VROOM_COLORS.dark,
+    color: VROOM_COLORS.white,
   },
   usernameInputWrapper: {
     flexDirection: 'row',
@@ -401,12 +403,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   usernamePrefix: { fontSize: 14, fontWeight: '600', color: VROOM_COLORS.muted, marginRight: 4 },
-  usernameInput: { flex: 1, paddingVertical: 11, fontSize: 14, color: VROOM_COLORS.dark },
+  usernameInput: { flex: 1, paddingVertical: 11, fontSize: 14, color: VROOM_COLORS.white },
   bioInput: { height: 90, textAlignVertical: 'top' },
   charCount: { fontSize: 10, color: VROOM_COLORS.muted, marginTop: 5, textAlign: 'right' },
   divider: { height: 0.5, backgroundColor: VROOM_COLORS.border, marginVertical: 18 },
   tagsSection: { marginBottom: 16 },
-  sectionTitle: { fontSize: 13, fontWeight: '700', color: VROOM_COLORS.dark, marginBottom: 4 },
+  sectionTitle: { fontSize: 13, fontWeight: '700', color: VROOM_COLORS.white, marginBottom: 4 },
   sectionHint: { fontSize: 10, color: VROOM_COLORS.muted, marginBottom: 12 },
   tagsContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
   tagChip: {
@@ -418,10 +420,10 @@ const styles = StyleSheet.create({
     gap: 5,
   },
   tagBrand: { backgroundColor: VROOM_COLORS.accent },
-  tagOutlined: { borderWidth: 1, borderColor: '#CCCCCC' },
+  tagOutlined: { borderWidth: 1, borderColor: VROOM_COLORS.border },
   tagChipText: { fontSize: 11, fontWeight: '600' },
   tagBrandText: { color: '#FFFFFF' },
-  tagOutlinedText: { color: VROOM_COLORS.dark },
+  tagOutlinedText: { color: VROOM_COLORS.whiteSoft },
   tagRemoveBtn: { padding: 2 },
   addTagGroup: {
     backgroundColor: VROOM_COLORS.fieldBg,
@@ -429,14 +431,14 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   addTagInput: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: VROOM_COLORS.bg,
     borderWidth: 1,
     borderColor: VROOM_COLORS.border,
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 9,
     fontSize: 13,
-    color: VROOM_COLORS.dark,
+    color: VROOM_COLORS.white,
     marginBottom: 10,
   },
   typeSelector: { flexDirection: 'row', gap: 6, marginBottom: 10 },
@@ -449,7 +451,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   typeBtnActive: { backgroundColor: VROOM_COLORS.accent, borderColor: VROOM_COLORS.accent },
-  typeBtnText: { fontSize: 10, fontWeight: '600', color: VROOM_COLORS.dark },
+  typeBtnText: { fontSize: 10, fontWeight: '600', color: VROOM_COLORS.whiteSoft },
   typeBtnTextActive: { color: '#FFFFFF' },
   addTagBtn: {
     flexDirection: 'row',

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -7,83 +7,26 @@ import {
   Pressable,
   ScrollView,
   Dimensions,
-  SafeAreaView,
   Share,
+  ActivityIndicator,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Image as ExpoImage } from 'expo-image';
-import { Ionicons, Feather } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
+import { supabase } from '../supabaseClient';
 import { useAppContext } from '../context';
+import CommentsSheet from './CommentsSheet';
 
-const { width, height } = Dimensions.get('window');
+const { width } = Dimensions.get('window');
 
-// --- Colors ---
-const VROOM_COLORS = {
-  bg: '#FFFFFF',
-  dark: '#140102',
-  accent: '#E50914',
-  muted: '#8E8E93',
-  fieldBg: 'rgba(20, 1, 2, 0.05)',
-  border: '#EEEEEE',
-};
-
-const FALLBACK_IMAGE = require('../assets/logo_vroom_Couleur.png');
-
-// Mock post data with full details
-const GARAGE_POST_DETAILS: { [key: string]: any } = {
-  '1': {
-    id: '1',
-    name: 'Ferrari F8',
-    image: 'https://images.unsplash.com/photo-1592198084033-aade902d1aae?w=400&h=400&fit=crop',
-    description: '2022 Ferrari F8 Tributo - Stunning Performance supercar with 710 HP V12 engine. Recently serviced and in pristine condition.',
-    date: '3 weeks ago',
-    likes: 1240,
-    comments: 45,
-  },
-  '2': {
-    id: '2',
-    name: 'Porsche 911',
-    image: 'https://cdn.pixabay.com/photo/2020/07/28/08/29/porsche-911-5444317_640.jpg',
-    description: '2021 Porsche 911 Turbo - Iconic German engineering with 580 HP. Track-ready with custom suspension upgrades.',
-    date: '2 months ago',
-    likes: 2100,
-    comments: 82,
-  },
-  '3': {
-    id: '3',
-    name: 'McLaren 720S',
-    image: 'https://images.unsplash.com/photo-1620882814836-98a2bc903323?w=400&h=400&fit=crop',
-    description: '2023 McLaren 720S - British luxury meets raw performance. 710 HP twin-turbo with carbon fiber body.',
-    date: '1 month ago',
-    likes: 3400,
-    comments: 156,
-  },
-  '4': {
-    id: '4',
-    name: 'Lamborghini',
-    image: 'https://images.unsplash.com/photo-1544636331-e26879cd3d9a?w=400&h=400&fit=crop',
-    description: 'Lamborghini Huracán Tecnica - Ultimate track-focused hypercar with 631 HP V10 engine. Limited production.',
-    date: '5 weeks ago',
-    likes: 5200,
-    comments: 203,
-  },
-  '5': {
-    id: '5',
-    name: 'Aston Martin',
-    image: 'https://images.unsplash.com/photo-1603584173870-7f23fdae1b7a?w=400&h=400&fit=crop',
-    description: 'Aston Martin DBS Superleggera - British elegance with 715 HP twin-turbo engine. Handcrafted luxury performance.',
-    date: '2 months ago',
-    likes: 1890,
-    comments: 67,
-  },
-  '6': {
-    id: '6',
-    name: 'Mercedes AMG',
-    image: 'https://images.unsplash.com/photo-1618843479313-40f8afb4b4d8?w=400&h=400&fit=crop',
-    description: 'Mercedes-AMG GT R Pro - German precision with 585 HP V8 engine. Aerodynamic masterpiece for the road and track.',
-    date: '1 week ago',
-    likes: 2650,
-    comments: 94,
-  },
+const C = {
+  bg:         '#140102',
+  surface:    'rgba(255,255,255,0.06)',
+  accent:     '#E50914',
+  white:      '#FFFFFF',
+  whiteSoft:  'rgba(255,255,255,0.65)',
+  whiteFaint: 'rgba(255,255,255,0.25)',
+  border:     'rgba(255,255,255,0.10)',
 };
 
 type PostDetailModalProps = {
@@ -99,176 +42,213 @@ type PostDetailModalProps = {
 };
 
 export default function PostDetailModal({ visible, post, onClose }: PostDetailModalProps) {
-  const { likePost, savePost, posts } = useAppContext();
-  const [isLiked, setIsLiked] = useState(false);
-  const [isSaved, setIsSaved] = useState(false);
+  const { user } = useAppContext();
+
+  const [isLiked, setIsLiked]   = useState(false);
+  const [isSaved, setIsSaved]   = useState(false);
+  const [likesCount, setLikesCount]     = useState(0);
+  const [commentsCount, setCommentsCount] = useState(0);
+  const [loading, setLoading]   = useState(false);
+  const [commentsVisible, setCommentsVisible] = useState(false);
+
+  // Charger les stats réelles depuis Supabase à l'ouverture
+  useEffect(() => {
+    if (!visible || !post?.id) return;
+    let cancelled = false;
+
+    const load = async () => {
+      setLoading(true);
+      const [postRes, likedRes, savedRes] = await Promise.all([
+        supabase.from('posts').select('likes_count, comments_count').eq('id', post.id).single(),
+        user?.id
+          ? supabase.from('post_likes').select('post_id').eq('post_id', post.id).eq('user_id', user.id).maybeSingle()
+          : Promise.resolve({ data: null }),
+        user?.id
+          ? supabase.from('saved_posts').select('post_id').eq('post_id', post.id).eq('user_id', user.id).maybeSingle()
+          : Promise.resolve({ data: null }),
+      ]);
+
+      if (cancelled) return;
+      setLikesCount(postRes.data?.likes_count ?? 0);
+      setCommentsCount(postRes.data?.comments_count ?? 0);
+      setIsLiked(!!likedRes.data);
+      setIsSaved(!!savedRes.data);
+      setLoading(false);
+    };
+
+    load();
+    return () => { cancelled = true; };
+  }, [visible, post?.id, user?.id]);
+
+  const handleLike = useCallback(async () => {
+    if (!user?.id || !post?.id) return;
+
+    if (isLiked) {
+      setIsLiked(false);
+      setLikesCount(prev => Math.max(0, prev - 1));
+      await supabase.from('post_likes').delete().eq('post_id', post.id).eq('user_id', user.id);
+      await supabase.from('posts').update({ likes_count: Math.max(0, likesCount - 1) }).eq('id', post.id);
+    } else {
+      setIsLiked(true);
+      setLikesCount(prev => prev + 1);
+      await supabase.from('post_likes').insert({ post_id: post.id, user_id: user.id });
+      await supabase.from('posts').update({ likes_count: likesCount + 1 }).eq('id', post.id);
+    }
+  }, [isLiked, user?.id, post?.id, likesCount]);
+
+  const handleSave = useCallback(async () => {
+    if (!user?.id || !post?.id) return;
+
+    if (isSaved) {
+      setIsSaved(false);
+      await supabase.from('saved_posts').delete().eq('post_id', post.id).eq('user_id', user.id);
+    } else {
+      setIsSaved(true);
+      await supabase.from('saved_posts').insert({ post_id: post.id, user_id: user.id });
+    }
+  }, [isSaved, user?.id, post?.id]);
+
+  const handleShare = useCallback(async () => {
+    if (!post) return;
+    try {
+      await Share.share({ message: `Découvre ce post sur Vroom : ${post.name}` });
+    } catch (_) {}
+  }, [post]);
+
+  const handleClose = useCallback(() => {
+    setCommentsVisible(false);
+    onClose();
+  }, [onClose]);
 
   if (!post) return null;
-
-  // Get post from global state or use mock data
-  const postData = posts.find(p => p.id === post.id) || GARAGE_POST_DETAILS[post.id] || post;
-  const likes = postData.likes || 0;
-  const comments = postData.comments || 0;
-
-  const handleLike = () => {
-    likePost(post.id);
-    setIsLiked(!isLiked);
-  };
-
-  const handleSave = () => {
-    savePost(post.id);
-    setIsSaved(!isSaved);
-  };
-
-  const handleShare = async () => {
-    try {
-      await Share.share({
-        message: `Check out this car: ${postData.name}`,
-        url: postData.image,
-        title: postData.name,
-      });
-    } catch (error) {
-      console.error('Share error:', error);
-    }
-  };
 
   return (
     <Modal
       animationType="slide"
       transparent={false}
       visible={visible}
-      onRequestClose={onClose}
+      onRequestClose={handleClose}
     >
-      <SafeAreaView style={styles.container}>
-        
-        {/* === HEADER === */}
+      <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+
+        {/* Header */}
         <View style={styles.header}>
-          <Pressable onPress={onClose} hitSlop={15}>
-            <Ionicons name="chevron-down" size={32} color={VROOM_COLORS.dark} />
+          <Pressable onPress={handleClose} hitSlop={15}>
+            <Ionicons name="chevron-down" size={28} color={C.white} />
           </Pressable>
-          <Text style={styles.headerTitle}>Post</Text>
-          <View style={{ width: 32 }} />
+          <Text style={styles.headerTitle} numberOfLines={1}>{post.name}</Text>
+          <Pressable onPress={handleShare} hitSlop={12}>
+            <Ionicons name="share-outline" size={22} color={C.whiteSoft} />
+          </Pressable>
         </View>
 
         <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.scrollContent}
         >
-          
-          {/* === IMAGE (OPTIMIZED) === */}
+          {/* Image 16:9 */}
           <ExpoImage
-            source={postData.image}
+            source={post.image || undefined}
             style={styles.postImage}
-            placeholder={FALLBACK_IMAGE}
-            contentFit="cover"
+            contentFit="contain"
             cachePolicy="memory-disk"
           />
 
-          {/* === POST INFO SECTION === */}
           <View style={styles.infoSection}>
-            {/* Title */}
-            <Text style={styles.postTitle}>{postData.name}</Text>
 
-            {/* Engagement Stats */}
-            <View style={styles.statsRow}>
-              <View style={styles.stat}>
-                <Text style={styles.statNumber}>{likes.toLocaleString()}</Text>
-                <Text style={styles.statLabel}>Likes</Text>
+            {/* Stats row */}
+            {loading ? (
+              <ActivityIndicator color={C.accent} style={{ marginVertical: 16 }} />
+            ) : (
+              <View style={styles.statsRow}>
+                <View style={styles.stat}>
+                  <Text style={styles.statNumber}>{likesCount.toLocaleString('fr-FR')}</Text>
+                  <Text style={styles.statLabel}>Likes</Text>
+                </View>
+                <View style={styles.statDivider} />
+                <View style={styles.stat}>
+                  <Text style={styles.statNumber}>{commentsCount}</Text>
+                  <Text style={styles.statLabel}>Commentaires</Text>
+                </View>
+                <View style={styles.statDivider} />
+                <View style={styles.stat}>
+                  <Text style={styles.statNumber}>—</Text>
+                  <Text style={styles.statLabel}>Partages</Text>
+                </View>
               </View>
-              <View style={styles.stat}>
-                <Text style={styles.statNumber}>{comments}</Text>
-                <Text style={styles.statLabel}>Comments</Text>
-              </View>
-              <View style={styles.stat}>
-                <Text style={styles.statNumber}>-</Text>
-                <Text style={styles.statLabel}>Shares</Text>
-              </View>
-            </View>
+            )}
 
             {/* Description */}
-            {postData.description && (
-              <Text style={styles.postDescription}>{postData.description}</Text>
-            )}
+            {post.description ? (
+              <Text style={styles.description}>{post.description}</Text>
+            ) : null}
 
             {/* Date */}
-            {postData.date && (
-              <Text style={styles.postDate}>{postData.date}</Text>
-            )}
+            {post.date ? (
+              <Text style={styles.date}>{post.date}</Text>
+            ) : null}
 
-            {/* Divider */}
             <View style={styles.divider} />
 
-            {/* === ACTION BUTTONS ROW === */}
+            {/* Action buttons */}
             <View style={styles.actionsRow}>
-              
-              {/* Like Button */}
+
               <Pressable
+                style={({ pressed }) => [styles.actionBtn, pressed && { opacity: 0.7 }]}
                 onPress={handleLike}
-                style={({ pressed }) => [styles.actionBtn, pressed && { opacity: 0.6 }]}
               >
-                <Feather
-                  name={isLiked ? 'heart' : 'heart'}
-                  size={20}
-                  color={isLiked ? VROOM_COLORS.accent : VROOM_COLORS.dark}
-                  fill={isLiked ? VROOM_COLORS.accent : 'none'}
+                <Ionicons
+                  name={isLiked ? 'heart' : 'heart-outline'}
+                  size={22}
+                  color={isLiked ? C.accent : C.whiteSoft}
                 />
-                <Text style={[styles.actionLabel, isLiked && { color: VROOM_COLORS.accent }]}>
-                  {isLiked ? 'Liked' : 'Like'}
+                <Text style={[styles.actionLabel, isLiked && { color: C.accent }]}>
+                  {isLiked ? 'Aimé' : 'Like'}
                 </Text>
               </Pressable>
 
-              {/* Comment Button */}
-              <Pressable style={({ pressed }) => [styles.actionBtn, pressed && { opacity: 0.6 }]}>
-                <Feather name="message-circle" size={20} color={VROOM_COLORS.dark} />
-                <Text style={styles.actionLabel}>Comment</Text>
+              <Pressable
+                style={({ pressed }) => [styles.actionBtn, pressed && { opacity: 0.7 }]}
+                onPress={() => setCommentsVisible(true)}
+              >
+                <Ionicons name="chatbubble-outline" size={22} color={C.whiteSoft} />
+                <Text style={styles.actionLabel}>Commenter</Text>
               </Pressable>
 
-              {/* Share Button */}
               <Pressable
+                style={({ pressed }) => [styles.actionBtn, pressed && { opacity: 0.7 }]}
                 onPress={handleShare}
-                style={({ pressed }) => [styles.actionBtn, pressed && { opacity: 0.6 }]}
               >
-                <Feather name="share" size={20} color={VROOM_COLORS.dark} />
-                <Text style={styles.actionLabel}>Share</Text>
+                <Ionicons name="share-outline" size={22} color={C.whiteSoft} />
+                <Text style={styles.actionLabel}>Partager</Text>
               </Pressable>
 
-              {/* Save Button */}
               <Pressable
+                style={({ pressed }) => [styles.actionBtn, pressed && { opacity: 0.7 }]}
                 onPress={handleSave}
-                style={({ pressed }) => [styles.actionBtn, pressed && { opacity: 0.6 }]}
               >
-                <Feather
-                  name={isSaved ? 'bookmark' : 'bookmark'}
-                  size={20}
-                  color={isSaved ? VROOM_COLORS.accent : VROOM_COLORS.dark}
-                  fill={isSaved ? VROOM_COLORS.accent : 'none'}
+                <Ionicons
+                  name={isSaved ? 'bookmark' : 'bookmark-outline'}
+                  size={22}
+                  color={isSaved ? C.accent : C.whiteSoft}
                 />
-                <Text style={[styles.actionLabel, isSaved && { color: VROOM_COLORS.accent }]}>
-                  {isSaved ? 'Saved' : 'Save'}
+                <Text style={[styles.actionLabel, isSaved && { color: C.accent }]}>
+                  {isSaved ? 'Sauvegardé' : 'Sauvegarder'}
                 </Text>
               </Pressable>
 
             </View>
 
-            {/* Divider 2 */}
-            <View style={styles.divider} />
-
-            {/* === REPOST BUTTON (PROMINENT) === */}
-            <Pressable
-              style={({ pressed }) => [
-                styles.repostBtn,
-                pressed && { backgroundColor: 'rgba(229, 9, 20, 0.1)' },
-              ]}
-            >
-              <Ionicons name="repeat" size={18} color={VROOM_COLORS.accent} />
-              <Text style={styles.repostText}>Repost to Your Garage</Text>
-            </Pressable>
-
           </View>
-
-          {/* Bottom Padding */}
-          <View style={{ height: 20 }} />
         </ScrollView>
+
+        {/* Comments sheet */}
+        <CommentsSheet
+          postId={post.id}
+          visible={commentsVisible}
+          onClose={() => setCommentsVisible(false)}
+          onCommentCountChange={(delta) => setCommentsCount(prev => Math.max(0, prev + delta))}
+        />
       </SafeAreaView>
     </Modal>
   );
@@ -277,10 +257,9 @@ export default function PostDetailModal({ visible, post, onClose }: PostDetailMo
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: VROOM_COLORS.bg,
+    backgroundColor: C.bg,
   },
 
-  // === HEADER ===
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -288,115 +267,96 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 0.5,
-    borderBottomColor: VROOM_COLORS.border,
+    borderBottomColor: C.border,
   },
   headerTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: VROOM_COLORS.dark,
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '700',
+    color: C.white,
+    textAlign: 'center',
+    marginHorizontal: 8,
   },
 
-  // === SCROLL ===
   scrollContent: {
-    paddingBottom: 0,
+    paddingBottom: 32,
   },
 
-  // === POST IMAGE (OPTIMIZED) ===
   postImage: {
     width: width,
-    height: (height * 2) / 5, // Reduced from 3/4 to 2/5 for better UX
-    backgroundColor: VROOM_COLORS.fieldBg,
+    aspectRatio: 4 / 3,
+    backgroundColor: '#000',
   },
 
-  // === INFO SECTION ===
   infoSection: {
     paddingHorizontal: 16,
-    paddingVertical: 20,
+    paddingTop: 20,
   },
-  postTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: VROOM_COLORS.dark,
-    marginBottom: 16,
-  },
+
   statsRow: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingVertical: 12,
-    marginBottom: 12,
+    alignItems: 'center',
+    paddingVertical: 14,
+    marginBottom: 16,
     borderTopWidth: 0.5,
     borderBottomWidth: 0.5,
-    borderTopColor: VROOM_COLORS.border,
-    borderBottomColor: VROOM_COLORS.border,
+    borderTopColor: C.border,
+    borderBottomColor: C.border,
   },
   stat: {
+    flex: 1,
     alignItems: 'center',
   },
+  statDivider: {
+    width: 0.5,
+    height: 28,
+    backgroundColor: C.border,
+  },
   statNumber: {
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: '700',
-    color: VROOM_COLORS.dark,
-    marginBottom: 4,
+    color: C.white,
+    marginBottom: 2,
   },
   statLabel: {
-    fontSize: 11,
-    color: VROOM_COLORS.muted,
+    fontSize: 10,
+    color: C.whiteFaint,
     fontWeight: '500',
+    letterSpacing: 0.4,
   },
-  postDescription: {
+
+  description: {
     fontSize: 14,
-    color: VROOM_COLORS.dark,
-    lineHeight: 20,
-    marginBottom: 12,
+    color: C.whiteSoft,
+    lineHeight: 21,
+    marginBottom: 10,
   },
-  postDate: {
-    fontSize: 12,
-    color: VROOM_COLORS.muted,
-    fontWeight: '400',
+  date: {
+    fontSize: 11,
+    color: C.whiteFaint,
     marginBottom: 16,
   },
 
-  // === DIVIDER ===
   divider: {
     height: 0.5,
-    backgroundColor: VROOM_COLORS.border,
+    backgroundColor: C.border,
     marginVertical: 16,
   },
 
-  // === ACTION BUTTONS ===
   actionsRow: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    paddingVertical: 12,
+    paddingVertical: 4,
   },
   actionBtn: {
-    flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 8,
-    paddingHorizontal: 16,
-    gap: 8,
+    paddingHorizontal: 12,
+    gap: 5,
   },
   actionLabel: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: VROOM_COLORS.dark,
-  },
-
-  // === REPOST BUTTON ===
-  repostBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-    height: 48,
-    borderRadius: 8,
-    backgroundColor: 'rgba(229, 9, 20, 0.05)',
-    borderWidth: 1.5,
-    borderColor: VROOM_COLORS.accent,
-  },
-  repostText: {
-    fontSize: 14,
+    fontSize: 11,
     fontWeight: '600',
-    color: VROOM_COLORS.accent,
+    color: C.whiteSoft,
   },
 });

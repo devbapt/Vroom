@@ -6,11 +6,11 @@ import {
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
-  SafeAreaView,
   Pressable,
   ActivityIndicator,
   ScrollView,
 } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../supabaseClient';
 
@@ -26,42 +26,67 @@ const COLORS = {
   fieldBgFocused: 'rgba(255, 250, 250, 0.10)',
 };
 
-interface FieldState {
-  next: boolean;
-  confirm: boolean;
-}
+type FieldKey = 'current' | 'next' | 'confirm';
 
 export default function ChangePasswordScreen({ navigation }: { navigation: any }) {
+  const insets = useSafeAreaInsets();
+
+  const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword]         = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [show, setShow]       = useState<FieldState>({ next: false, confirm: false });
-  const [focused, setFocused] = useState<FieldState>({ next: false, confirm: false });
+  const [show, setShow]       = useState<Record<FieldKey, boolean>>({ current: false, next: false, confirm: false });
+  const [focused, setFocused] = useState<Record<FieldKey, boolean>>({ current: false, next: false, confirm: false });
   const [error, setError]     = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const toggleShow = (f: keyof FieldState) => setShow(p => ({ ...p, [f]: !p[f] }));
-  const onFocus    = (f: keyof FieldState) => setFocused(p => ({ ...p, [f]: true }));
-  const onBlur     = (f: keyof FieldState) => setFocused(p => ({ ...p, [f]: false }));
+  const toggleShow = (f: FieldKey) => setShow(p => ({ ...p, [f]: !p[f] }));
+  const onFocus    = (f: FieldKey) => setFocused(p => ({ ...p, [f]: true }));
+  const onBlur     = (f: FieldKey) => setFocused(p => ({ ...p, [f]: false }));
 
   const handleUpdate = async () => {
     setError('');
     setSuccess('');
 
-    if (!newPassword || !confirmPassword) {
+    if (!currentPassword || !newPassword || !confirmPassword) {
       setError('Veuillez remplir tous les champs.');
       return;
     }
     if (newPassword !== confirmPassword) {
-      setError('Les mots de passe ne correspondent pas.');
+      setError('Les nouveaux mots de passe ne correspondent pas.');
       return;
     }
     if (newPassword.length < 6) {
-      setError('Le mot de passe doit contenir au moins 6 caractères.');
+      setError('Le nouveau mot de passe doit contenir au moins 6 caractères.');
+      return;
+    }
+    if (currentPassword === newPassword) {
+      setError('Le nouveau mot de passe doit être différent de l\'actuel.');
       return;
     }
 
     setLoading(true);
+
+    // Vérifier le mot de passe actuel
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user?.email) {
+      setError('Impossible de vérifier votre identité. Reconnectez-vous.');
+      setLoading(false);
+      return;
+    }
+
+    const { error: verifyError } = await supabase.auth.signInWithPassword({
+      email: user.email,
+      password: currentPassword,
+    });
+
+    if (verifyError) {
+      setError('Mot de passe actuel incorrect.');
+      setLoading(false);
+      return;
+    }
+
+    // Mettre à jour avec le nouveau mot de passe
     const { error: updateError } = await supabase.auth.updateUser({ password: newPassword });
     setLoading(false);
 
@@ -69,14 +94,19 @@ export default function ChangePasswordScreen({ navigation }: { navigation: any }
       setError(updateError.message);
     } else {
       setSuccess('Mot de passe mis à jour avec succès.');
+      setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
     }
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.kav}>
+    <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.kav}
+        keyboardVerticalOffset={insets.top}
+      >
         <ScrollView
           contentContainerStyle={styles.container}
           keyboardShouldPersistTaps="handled"
@@ -90,9 +120,38 @@ export default function ChangePasswordScreen({ navigation }: { navigation: any }
 
           {/* Title */}
           <View style={styles.titleBlock}>
-            <Text style={styles.title}>Nouveau mot de passe</Text>
-            <Text style={styles.subtitle}>Choisissez un mot de passe sécurisé pour votre compte</Text>
+            <Text style={styles.title}>Changer de mot de passe</Text>
+            <Text style={styles.subtitle}>Confirmez d'abord votre mot de passe actuel</Text>
           </View>
+
+          {/* Current password */}
+          <View style={[styles.inputWrapper, focused.current && styles.inputFocused]}>
+            <Ionicons
+              name="lock-closed-outline"
+              size={20}
+              color={focused.current ? COLORS.accent : COLORS.textMuted}
+              style={styles.icon}
+            />
+            <TextInput
+              style={[styles.input, Platform.OS === 'web' && { outlineStyle: 'none' } as any]}
+              placeholder="Mot de passe actuel"
+              placeholderTextColor={COLORS.textMuted}
+              secureTextEntry={!show.current}
+              value={currentPassword}
+              onChangeText={t => { setCurrentPassword(t); if (error) setError(''); }}
+              onFocus={() => onFocus('current')}
+              onBlur={() => onBlur('current')}
+            />
+            <Pressable onPress={() => toggleShow('current')} hitSlop={8} style={styles.eyeBtn}>
+              <Ionicons
+                name={show.current ? 'eye-off-outline' : 'eye-outline'}
+                size={20}
+                color={focused.current ? COLORS.accent : COLORS.textMuted}
+              />
+            </Pressable>
+          </View>
+
+          <View style={styles.divider} />
 
           {/* New password */}
           <View style={[styles.inputWrapper, focused.next && styles.inputFocused]}>
@@ -131,7 +190,7 @@ export default function ChangePasswordScreen({ navigation }: { navigation: any }
             />
             <TextInput
               style={[styles.input, Platform.OS === 'web' && { outlineStyle: 'none' } as any]}
-              placeholder="Confirmer le mot de passe"
+              placeholder="Confirmer le nouveau mot de passe"
               placeholderTextColor={COLORS.textMuted}
               secureTextEntry={!show.confirm}
               value={confirmPassword}
@@ -181,16 +240,18 @@ const styles = StyleSheet.create({
   kav:      { flex: 1 },
   container: { flexGrow: 1, paddingHorizontal: 25, justifyContent: 'center', paddingVertical: 40 },
 
-  logoRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12, marginBottom: 40 },
+  logoRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12, marginBottom: 32 },
 
-  titleBlock: { marginBottom: 32 },
+  titleBlock: { marginBottom: 28 },
   title:    { color: COLORS.text, fontSize: 22, fontWeight: '700', textAlign: 'center', marginBottom: 6 },
   subtitle: { color: COLORS.textMuted, fontSize: 13, textAlign: 'center' },
+
+  divider: { height: 1, backgroundColor: 'rgba(255,250,250,0.08)', marginBottom: 14, marginTop: 2 },
 
   inputWrapper: {
     flexDirection: 'row', alignItems: 'center',
     backgroundColor: COLORS.fieldBg, borderRadius: 10,
-    paddingHorizontal: 15, marginBottom: 15, height: 55,
+    paddingHorizontal: 15, marginBottom: 12, height: 55,
     borderWidth: 1, borderColor: 'transparent',
   },
   inputFocused: { borderColor: COLORS.accent, backgroundColor: COLORS.fieldBgFocused },
@@ -203,7 +264,7 @@ const styles = StyleSheet.create({
 
   submitBtn: {
     backgroundColor: COLORS.accent, height: 55, borderRadius: 10,
-    justifyContent: 'center', alignItems: 'center', marginTop: 4,
+    justifyContent: 'center', alignItems: 'center', marginTop: 8,
   },
   submitText: { color: COLORS.text, fontSize: 16, fontWeight: 'bold' },
 

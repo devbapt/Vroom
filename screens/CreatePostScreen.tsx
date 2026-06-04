@@ -444,7 +444,7 @@ export default function CreatePostScreen() {
           <View style={{ flex: 3 }}>
             <FieldInput label={t.modelField} value={model} onChangeText={setModel} placeholder="911 GT3 RS" />
           </View>
-          <View style={{ flex: 1 }}>
+          <View style={{ minWidth: 80 }}>
             <FieldInput label={t.year} value={year} onChangeText={setYear} placeholder="2024" keyboardType="numeric" />
           </View>
         </View>

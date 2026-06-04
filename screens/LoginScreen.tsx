@@ -7,11 +7,11 @@ import {
   KeyboardAvoidingView,
   ScrollView,
   Platform,
-  SafeAreaView,
   Pressable,
   ActivityIndicator,
   Alert,
 } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../supabaseClient'; 
 
@@ -32,6 +32,7 @@ const COLORS = {
 };
 
 export default function LoginScreen({ navigation }: { navigation: any }) {
+  const insets = useSafeAreaInsets();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -82,10 +83,11 @@ export default function LoginScreen({ navigation }: { navigation: any }) {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardView}
+        keyboardVerticalOffset={insets.top}
       >
         <ScrollView
           contentContainerStyle={styles.container}

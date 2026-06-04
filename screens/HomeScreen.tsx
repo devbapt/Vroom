@@ -8,6 +8,7 @@ import {
   StatusBar,
   ListRenderItemInfo,
   RefreshControl,
+  InteractionManager,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -113,10 +114,14 @@ export default function HomeScreen() {
     setPosts(unique.map(r => mapRowToPost(r, savedIdsSet, likedIdsSet)));
   }, [user?.id]);
 
-  // Charge le feed au montage et à chaque retour sur l'écran (ex: après publication)
+  // Charge le feed après que les animations de navigation soient terminées
+  // InteractionManager évite que le fetch Supabase ne bloque le thread JS pendant la transition
   useFocusEffect(
     useCallback(() => {
-      fetchPosts();
+      const task = InteractionManager.runAfterInteractions(() => {
+        fetchPosts();
+      });
+      return () => task.cancel();
     }, [fetchPosts])
   );
 

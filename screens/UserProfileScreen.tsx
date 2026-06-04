@@ -5,12 +5,14 @@ import {
   StyleSheet,
   Pressable,
   ScrollView,
-  SafeAreaView,
   Dimensions,
   Share,
   ActivityIndicator,
   TouchableOpacity,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
+
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image as ExpoImage } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
@@ -18,21 +20,27 @@ import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { supabase } from '../supabaseClient';
 import { useAppContext } from '../context';
 import type { HomeStackParamList } from '../navigation/HomeStackNavigator';
+import PostDetailModal from './PostDetailModal';
 
 const { width } = Dimensions.get('window');
 
 const C = {
-  bg: '#FFFFFF',
-  dark: '#121212',
-  accent: '#D91D2F',
-  muted: '#9E9E9E',
-  fieldBg: 'rgba(18,18,18,0.05)',
-  border: '#F0F0F0',
+  bg:         '#140102',
+  bgCard:     '#1F0808',
+  bgElevated: '#2A0A0A',
+  dark:       '#140102',
+  accent:     '#E50914',
+  muted:      'rgba(255,255,255,0.45)',
+  fieldBg:    'rgba(255,255,255,0.07)',
+  border:     'rgba(255,255,255,0.12)',
+  white:      '#FFFFFF',
+  whiteSoft:  'rgba(255,255,255,0.7)',
 };
 
 const PAD = 16;
-const PUB_GAP = 2;
-const PUB_SIZE = Math.floor((width - PUB_GAP * 2) / 3);
+const CARD_GAP    = 1;
+const CARD_WIDTH  = Math.floor((width - CARD_GAP) / 2);
+const CARD_HEIGHT = Math.floor(CARD_WIDTH * 5 / 4);
 const FALLBACK = require('../assets/logo_vroom_Couleur.png');
 
 const POST_TYPE_ICON: Record<string, string> = {
@@ -76,6 +84,9 @@ export default function UserProfileScreen() {
   const [followersCount, setFollowersCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'garage' | 'publications' | 'itineraires'>('publications');
+  const [selectedPost, setSelectedPost] = useState<{
+    id: string; name: string; image: string; description?: string; date?: string;
+  } | null>(null);
 
   const canFollow = !!user?.id && user.id !== userId;
 
@@ -127,25 +138,66 @@ export default function UserProfileScreen() {
 
   const handleToggleFollow = useCallback(async () => {
     if (!user?.id) return;
+
     if (isFollowing) {
+      // Optimistic update
       setIsFollowing(false);
       setFollowersCount(prev => Math.max(0, prev - 1));
-      await supabase.from('followers').delete()
-        .eq('follower_id', user.id).eq('following_id', userId);
-      await supabase.from('profiles')
-        .update({ followers_count: Math.max(0, followersCount - 1) })
-        .eq('id', userId);
+
+      const { error: deleteError } = await supabase.from('followers')
+        .delete()
+        .eq('follower_id', user.id)
+        .eq('following_id', userId);
+
+      if (deleteError) {
+        console.error('[Follow] unfollow error:', deleteError.message);
+        // Revert
+        setIsFollowing(true);
+        setFollowersCount(prev => prev + 1);
+        return;
+      }
+
+      // Decrement count using DB value to avoid stale closure issues
+      await supabase.rpc('decrement_followers_count', { profile_id: userId }).catch(() => {
+        // Fallback: direct update if RPC doesn't exist
+        supabase.from('profiles')
+          .update({ followers_count: Math.max(0, followersCount - 1) })
+          .eq('id', userId);
+      });
     } else {
+      // Optimistic update
       setIsFollowing(true);
       setFollowersCount(prev => prev + 1);
-      await supabase.from('followers').insert({
+
+      const { error: insertError } = await supabase.from('followers').insert({
         follower_id: user.id,
         following_id: userId,
       });
-      await supabase.from('profiles')
-        .update({ followers_count: followersCount + 1 })
-        .eq('id', userId);
+
+      if (insertError) {
+        console.error('[Follow] follow error:', insertError.message);
+        // Revert
+        setIsFollowing(false);
+        setFollowersCount(prev => Math.max(0, prev - 1));
+        return;
+      }
+
+      // Increment count using DB value to avoid stale closure issues
+      await supabase.rpc('increment_followers_count', { profile_id: userId }).catch(() => {
+        // Fallback: direct update if RPC doesn't exist
+        supabase.from('profiles')
+          .update({ followers_count: followersCount + 1 })
+          .eq('id', userId);
+      });
     }
+
+    // Re-fetch the real count from DB to ensure UI matches persisted state
+    const { data: refreshed } = await supabase
+      .from('profiles')
+      .select('followers_count')
+      .eq('id', userId)
+      .single();
+    if (refreshed) setFollowersCount(refreshed.followers_count ?? 0);
   }, [isFollowing, user?.id, userId, followersCount]);
 
   const handleShare = useCallback(async () => {
@@ -316,20 +368,36 @@ export default function UserProfileScreen() {
               </View>
             ) : (
               posts.map((post) => (
-                <View key={post.id} style={styles.pubItem}>
+                <Pressable
+                  key={post.id}
+                  style={styles.card}
+                  onPress={() =>
+                    setSelectedPost({
+                      id: post.id,
+                      name: post.type ?? 'Publication',
+                      image: post.image_urls?.[0] ?? '',
+                    })
+                  }
+                >
                   <ExpoImage
                     source={post.image_urls?.[0] ?? undefined}
-                    style={StyleSheet.absoluteFillObject}
+                    style={StyleSheet.absoluteFill}
                     contentFit="cover"
                     placeholder={FALLBACK}
                     cachePolicy="memory-disk"
                   />
                   {post.type && (
-                    <View style={styles.pubTypeBadge}>
+                    <View style={styles.cardTypeBadge}>
                       <Ionicons name={(POST_TYPE_ICON[post.type] ?? 'ellipse') as any} size={10} color="#FFF" />
                     </View>
                   )}
-                </View>
+                  <LinearGradient
+                    colors={['transparent', 'rgba(0,0,0,0.8)']}
+                    style={styles.cardOverlay}
+                  >
+                    <Text style={styles.cardTitle} numberOfLines={1}>{post.type ?? '—'}</Text>
+                  </LinearGradient>
+                </Pressable>
               ))
             )}
           </View>
@@ -343,6 +411,12 @@ export default function UserProfileScreen() {
           </View>
         )}
       </ScrollView>
+
+      <PostDetailModal
+        visible={selectedPost !== null}
+        post={selectedPost}
+        onClose={() => setSelectedPost(null)}
+      />
     </SafeAreaView>
   );
 }
@@ -363,7 +437,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 13,
     fontWeight: '700',
-    color: C.dark,
+    color: C.white,
     textAlign: 'center',
   },
 
@@ -396,12 +470,12 @@ const styles = StyleSheet.create({
 
   statsRow: { flex: 1, flexDirection: 'row', justifyContent: 'space-around' },
   statCol: { alignItems: 'center' },
-  statValue: { fontSize: 14, fontWeight: '700', color: C.dark, marginBottom: 1 },
+  statValue: { fontSize: 14, fontWeight: '700', color: C.white, marginBottom: 1 },
   statLabel: { fontSize: 10, color: C.muted },
 
   bioSection: { paddingHorizontal: PAD, paddingBottom: 8 },
-  bioName: { fontSize: 13, fontWeight: '700', color: C.dark, marginBottom: 2 },
-  bioText: { fontSize: 11, color: C.dark, lineHeight: 16 },
+  bioName: { fontSize: 13, fontWeight: '700', color: C.white, marginBottom: 2 },
+  bioText: { fontSize: 11, color: C.whiteSoft, lineHeight: 16 },
 
   actionRow: { flexDirection: 'row', paddingHorizontal: PAD, paddingBottom: 14, gap: 8, alignItems: 'center' },
   followBtn: {
@@ -415,26 +489,26 @@ const styles = StyleSheet.create({
   followBtnFollowing: {
     backgroundColor: 'transparent',
     borderWidth: 1.5,
-    borderColor: '#CCCCCC',
+    borderColor: C.border,
   },
   followBtnText: { fontSize: 14, fontWeight: '700', color: '#FFFFFF' },
-  followBtnTextFollowing: { color: C.dark },
+  followBtnTextFollowing: { color: C.whiteSoft },
   editBtn: {
     flex: 1,
     height: 38,
     borderRadius: 10,
     borderWidth: 1.5,
-    borderColor: '#CCCCCC',
+    borderColor: C.border,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  editBtnText: { fontSize: 13, fontWeight: '600', color: C.dark },
+  editBtnText: { fontSize: 13, fontWeight: '600', color: C.whiteSoft },
   shareBtn: {
     width: 38,
     height: 38,
     borderRadius: 10,
     borderWidth: 1.5,
-    borderColor: '#CCCCCC',
+    borderColor: C.border,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -455,33 +529,26 @@ const styles = StyleSheet.create({
     borderBottomWidth: 2,
     borderBottomColor: 'transparent',
   },
-  tabItemActive: { borderBottomColor: C.dark },
+  tabItemActive: { borderBottomColor: C.white },
   tabText: { fontSize: 10, color: C.muted, fontWeight: '500' },
-  tabTextActive: { color: C.dark, fontWeight: '700' },
+  tabTextActive: { color: C.white, fontWeight: '700' },
 
-  pubGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: PUB_GAP, paddingTop: 2 },
-  pubItem: { width: PUB_SIZE, height: PUB_SIZE, backgroundColor: C.fieldBg },
-  pubItemMeta: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    padding: 4,
-    backgroundColor: 'rgba(0,0,0,0.45)',
+  pubGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: CARD_GAP, paddingTop: CARD_GAP },
+  card: { width: CARD_WIDTH, height: CARD_HEIGHT, backgroundColor: C.fieldBg, overflow: 'hidden' },
+  cardOverlay: {
+    position: 'absolute', bottom: 0, left: 0, right: 0,
+    padding: 8, paddingBottom: 10,
   },
+  cardTitle: { color: '#FFF', fontSize: 12, fontWeight: '700' },
+  cardTypeBadge: {
+    position: 'absolute', top: 6, left: 6,
+    width: 22, height: 22, borderRadius: 11,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    justifyContent: 'center', alignItems: 'center',
+  },
+  pubItemMeta: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 4, backgroundColor: 'rgba(0,0,0,0.45)' },
   pubItemName: { fontSize: 9, fontWeight: '700', color: '#FFF' },
   pubItemYear: { fontSize: 8, color: 'rgba(255,255,255,0.8)' },
-  pubTypeBadge: {
-    position: 'absolute',
-    top: 5,
-    left: 5,
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: 'rgba(0,0,0,0.55)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
 
   emptyTab: { alignItems: 'center', paddingVertical: 60, gap: 12, width: '100%' },
   emptyTabText: { color: C.muted, fontSize: 12 },
