@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+﻿import { useState, useCallback } from 'react';
 import {
   View, Text, TextInput, StyleSheet, ScrollView,
   Pressable, Switch, ActivityIndicator, Alert, Platform,
@@ -13,8 +13,14 @@ import { supabase } from '../supabaseClient';
 import { useAppContext } from '../context/AppContext';
 
 const C = {
-  bg: '#FFFFFF', dark: '#121212', accent: '#D91D2F',
-  muted: '#8E8E93', border: '#F0F0F0', fieldBg: '#F7F7F7',
+  bg:       '#140102',
+  dark:     '#140102',
+  accent:   '#E50914',
+  muted:    'rgba(255,255,255,0.45)',
+  border:   'rgba(255,255,255,0.12)',
+  fieldBg:  '#1F0808',
+  white:    '#FFFFFF',
+  whiteSoft:'rgba(255,255,255,0.7)',
 };
 const PAD = 20;
 
@@ -105,7 +111,7 @@ export default function CreateGroupScreen() {
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={12} style={styles.headerBtn}>
-          <Ionicons name="chevron-back" size={22} color={C.dark} />
+          <Ionicons name="chevron-back" size={22} color={C.white} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Nouveau groupe</Text>
         <TouchableOpacity
@@ -169,7 +175,7 @@ export default function CreateGroupScreen() {
 
           {/* Settings */}
           <View style={styles.settingsCard}>
-            <Text style={styles.settingsTitle}>Conditions d'adhésion</Text>
+            <Text style={styles.settingsTitle}>{"Conditions d'adhésion"}</Text>
 
             <ToggleRow
               icon="lock-closed-outline"
@@ -202,8 +208,7 @@ export default function CreateGroupScreen() {
           <View style={styles.infoBox}>
             <Ionicons name="information-circle-outline" size={16} color={C.accent} />
             <Text style={styles.infoText}>
-              En tant que créateur, vous êtes automatiquement administrateur du groupe.
-              Vous pourrez inviter des membres et gérer les demandes depuis la page du groupe.
+              {"En tant que créateur, vous êtes automatiquement administrateur du groupe.\nVous pourrez inviter des membres et gérer les demandes depuis la page du groupe."}
             </Text>
           </View>
 
@@ -244,7 +249,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: C.border,
   },
   headerBtn:   { padding: 4 },
-  headerTitle: { fontSize: 16, fontWeight: '700', color: C.dark },
+  headerTitle: { fontSize: 16, fontWeight: '700', color: C.white },
   createBtn: {
     backgroundColor: C.accent, paddingHorizontal: 16, paddingVertical: 7,
     borderRadius: 20, minWidth: 60, alignItems: 'center',
@@ -271,13 +276,13 @@ const styles = StyleSheet.create({
 
   // Fields
   section:    { gap: 6 },
-  label:      { fontSize: 12, fontWeight: '700', color: C.dark, letterSpacing: 0.3 },
+  label:      { fontSize: 12, fontWeight: '700', color: C.white, letterSpacing: 0.3 },
   required:   { color: C.accent },
   charCount:  { fontSize: 10, color: C.muted, textAlign: 'right' },
   input: {
     backgroundColor: C.fieldBg, borderRadius: 12,
     paddingHorizontal: 14, paddingVertical: 12,
-    fontSize: 14, color: C.dark,
+    fontSize: 14, color: C.white,
     borderWidth: 1, borderColor: C.border,
   },
   inputMulti: { minHeight: 88, textAlignVertical: 'top' },
@@ -302,7 +307,7 @@ const styles = StyleSheet.create({
   },
   toggleIconActive: { backgroundColor: C.accent },
   toggleText: { flex: 1, gap: 2 },
-  toggleLabel: { fontSize: 13, fontWeight: '600', color: C.dark },
+  toggleLabel: { fontSize: 13, fontWeight: '600', color: C.white },
   toggleSub:   { fontSize: 11, color: C.muted, lineHeight: 15 },
 
   // Info
@@ -312,5 +317,5 @@ const styles = StyleSheet.create({
     borderRadius: 12, padding: 14,
     borderWidth: 1, borderColor: 'rgba(217,29,47,0.15)',
   },
-  infoText: { flex: 1, fontSize: 12, color: C.dark, lineHeight: 18 },
+  infoText: { flex: 1, fontSize: 12, color: C.white, lineHeight: 18 },
 });

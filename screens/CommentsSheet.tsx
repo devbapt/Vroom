@@ -7,13 +7,13 @@ import {
   Pressable,
   FlatList,
   TextInput,
-  KeyboardAvoidingView,
   Platform,
   Dimensions,
   Animated,
   Alert,
   ActivityIndicator,
   ListRenderItemInfo,
+  Keyboard,
 } from 'react-native';
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
@@ -134,6 +134,15 @@ export default function CommentsSheet({ postId, visible, onClose, onCommentCount
   const [replyTo, setReplyTo] = useState<Comment | null>(null);
 
   const slideAnim = useRef(new Animated.Value(700)).current;
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const showSub = Keyboard.addListener(showEvent, e => setKeyboardHeight(e.endCoordinates.height));
+    const hideSub = Keyboard.addListener(hideEvent, () => setKeyboardHeight(0));
+    return () => { showSub.remove(); hideSub.remove(); };
+  }, []);
 
   useEffect(() => {
     if (visible) {
@@ -161,23 +170,55 @@ export default function CommentsSheet({ postId, visible, onClose, onCommentCount
     if (!postId) return;
     setLoading(true);
 
-    const [commentsRes, likedRes, savedRes] = await Promise.all([
-      supabase
-        .from('post_comments')
-        .select('id, user_id, content, likes_count, parent_id, created_at, profiles!user_id(id, username, avatar_url)')
-        .eq('post_id', postId)
-        .order('created_at', { ascending: true }),
-      user?.id
-        ? supabase.from('comment_likes').select('comment_id').eq('user_id', user.id)
-        : Promise.resolve({ data: [] as any[] }),
-      user?.id
-        ? supabase.from('comment_saves').select('comment_id').eq('user_id', user.id)
-        : Promise.resolve({ data: [] as any[] }),
-    ]);
+    try {
+      const [commentsRes, likedRes, savedRes] = await Promise.all([
+        // Fetch without FK-based profile join to avoid dependency on FK relationship
+        supabase
+          .from('post_comments')
+          .select('id, user_id, content, likes_count, parent_id, created_at')
+          .eq('post_id', postId)
+          .order('created_at', { ascending: true }),
+        user?.id
+          ? supabase.from('comment_likes').select('comment_id').eq('user_id', user.id)
+          : Promise.resolve({ data: [] as any[], error: null }),
+        user?.id
+          ? supabase.from('comment_saves').select('comment_id').eq('user_id', user.id)
+          : Promise.resolve({ data: [] as any[], error: null }),
+      ]);
 
-    const likedIds = new Set((likedRes.data ?? []).map((r: any) => r.comment_id));
-    const savedIds = new Set((savedRes.data ?? []).map((r: any) => r.comment_id));
-    setComments((commentsRes.data ?? []).map((c: any) => ({ ...c, isLiked: likedIds.has(c.id), isSaved: savedIds.has(c.id) })));
+      if (commentsRes.error) {
+        console.error('[CommentsSheet] fetchComments error:', commentsRes.error.message);
+        setLoading(false);
+        return;
+      }
+
+      const commentRows = commentsRes.data ?? [];
+
+      // Fetch profiles for all unique user_ids in a single query (no FK required)
+      const userIds = [...new Set(commentRows.map((c: any) => c.user_id as string))];
+      let profileMap: Record<string, { id: string; username: string; avatar_url: string }> = {};
+      if (userIds.length > 0) {
+        const { data: profilesData } = await supabase
+          .from('profiles')
+          .select('id, username, avatar_url')
+          .in('id', userIds);
+        (profilesData ?? []).forEach((p: any) => { profileMap[p.id] = p; });
+      }
+
+      const likedIds = new Set((likedRes.data ?? []).map((r: any) => r.comment_id));
+      const savedIds = new Set((savedRes.data ?? []).map((r: any) => r.comment_id));
+
+      setComments(commentRows.map((c: any) => ({
+        ...c,
+        likes_count: c.likes_count ?? 0,
+        profiles: profileMap[c.user_id] ?? { id: c.user_id, username: 'Utilisateur', avatar_url: '' },
+        isLiked: likedIds.has(c.id),
+        isSaved: savedIds.has(c.id),
+      })));
+    } catch (e) {
+      console.error('[CommentsSheet] unexpected error:', e);
+    }
+
     setLoading(false);
   };
 
@@ -193,18 +234,26 @@ export default function CommentsSheet({ postId, visible, onClose, onCommentCount
         content: text.trim(),
         parent_id: replyTo?.id ?? null,
       })
-      .select('id, user_id, content, likes_count, parent_id, created_at, profiles!user_id(id, username, avatar_url)')
+      .select('id, user_id, content, likes_count, parent_id, created_at')
       .single();
 
     if (!error && data) {
+      // Fetch the commenter's profile separately
+      let profile = { id: user.id, username: 'Utilisateur', avatar_url: user.avatar ?? '' };
+      const { data: profileData } = await supabase
+        .from('profiles').select('id, username, avatar_url').eq('id', user.id).single();
+      if (profileData) profile = profileData;
+
       const newComment: Comment = {
         ...data,
-        profiles: Array.isArray(data.profiles) ? data.profiles[0] : data.profiles,
+        likes_count: data.likes_count ?? 0,
+        profiles: profile,
         isLiked: false,
         isSaved: false,
       };
       setComments(prev => [...prev, newComment]);
       onCommentCountChange?.(1);
+      // comments_count mis à jour automatiquement par le trigger DB
     }
     setText('');
     setReplyTo(null);
@@ -249,13 +298,18 @@ export default function CommentsSheet({ postId, visible, onClose, onCommentCount
       {
         text: 'Supprimer', style: 'destructive',
         onPress: async () => {
-          await supabase.from('post_comments').delete().eq('id', commentId);
+          const { error } = await supabase.from('post_comments').delete().eq('id', commentId);
+          if (error) {
+            console.error('[CommentsSheet] delete error:', error.message);
+            return;
+          }
           setComments(prev => prev.filter(c => c.id !== commentId));
           onCommentCountChange?.(-1);
+          // comments_count mis à jour automatiquement par le trigger DB
         },
       },
     ]);
-  }, [onCommentCountChange]);
+  }, [onCommentCountChange, postId]);
 
   // Build flat list: top-level comments interleaved with their replies
   const flatList: Array<Comment & { isReply: boolean }> = [];
@@ -285,11 +339,8 @@ export default function CommentsSheet({ postId, visible, onClose, onCommentCount
     <Modal transparent animationType="none" visible={visible} onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose} />
 
-      {/* KAV enveloppe toute la feuille : elle monte au-dessus du clavier */}
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.sheetWrapper}
-      >
+      {/* Le sheet monte avec le clavier via keyboardHeight — fonctionne même dans un Modal imbriqué */}
+      <View style={[styles.sheetWrapper, { bottom: keyboardHeight }]}>
         <Animated.View
           style={[styles.sheet, { transform: [{ translateY: slideAnim }] }]}
         >
@@ -365,7 +416,7 @@ export default function CommentsSheet({ postId, visible, onClose, onCommentCount
             </Pressable>
           </View>
         </Animated.View>
-      </KeyboardAvoidingView>
+      </View>
     </Modal>
   );
 }
@@ -375,7 +426,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
   },
-  // KAV positionné en bas — monte avec le clavier
+  // Sheet ancrée en bas, monte dynamiquement via keyboardHeight
   sheetWrapper: {
     position: 'absolute',
     bottom: 0,

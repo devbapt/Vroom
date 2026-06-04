@@ -18,14 +18,17 @@ import {
 // ─── Design tokens ────────────────────────────────────────────────────────────
 
 const C = {
-  bg:       '#FFFFFF',
-  dark:     '#121212',
-  accent:   '#D91D2F',
-  muted:    '#8E8E93',
-  border:   '#F0F0F0',
-  inputBg:  '#F5F5F7',
-  rowHover: '#FAFAFA',
-  groupTag: 'rgba(217,29,47,0.08)',
+  bg:       '#140102',
+  bgCard:   '#1F0808',
+  dark:     '#140102',
+  accent:   '#E50914',
+  muted:    'rgba(255,255,255,0.45)',
+  border:   'rgba(255,255,255,0.12)',
+  inputBg:  '#1F0808',
+  rowHover: '#2A0A0A',
+  groupTag: 'rgba(229,9,20,0.10)',
+  white:    '#FFFFFF',
+  whiteSoft:'rgba(255,255,255,0.7)',
 };
 
 const PAD = 16;
@@ -405,7 +408,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: PAD, paddingTop: 10, paddingBottom: 10,
   },
-  title:      { fontSize: 20, fontWeight: '700', color: C.dark, letterSpacing: -0.3 },
+  title:      { fontSize: 20, fontWeight: '700', color: C.white, letterSpacing: -0.3 },
   composeBtn: {
     flexDirection: 'row', alignItems: 'flex-start',
     width: 38, height: 38, borderRadius: 19,
@@ -420,8 +423,8 @@ const styles = StyleSheet.create({
     backgroundColor: C.inputBg, borderRadius: 12, paddingHorizontal: 12, height: 38,
     borderWidth: 1.5, borderColor: 'transparent',
   },
-  searchBarFocused: { borderColor: C.accent, backgroundColor: C.bg },
-  searchInput: { flex: 1, fontSize: 14, color: C.dark },
+  searchBarFocused: { borderColor: C.accent, backgroundColor: '#2A0A0A' },
+  searchInput: { flex: 1, fontSize: 14, color: C.white },
   cancelBtn:   { paddingVertical: 4 },
   cancelText:  { color: C.accent, fontSize: 14, fontWeight: '600' },
 
@@ -429,7 +432,7 @@ const styles = StyleSheet.create({
   tabs: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: C.border, marginHorizontal: PAD },
   tabItem: { flex: 1, alignItems: 'center', paddingVertical: 10, position: 'relative' },
   tabLabel:       { fontSize: 14, fontWeight: '500', color: C.muted },
-  tabLabelActive: { color: C.dark, fontWeight: '700' },
+  tabLabelActive: { color: C.white, fontWeight: '700' },
   tabIndicator:   { position: 'absolute', bottom: -1, left: '15%', right: '15%', height: 2.5, borderRadius: 2, backgroundColor: C.accent },
 
   // Rows
@@ -442,10 +445,10 @@ const styles = StyleSheet.create({
   avatarText:        { color: '#FFF', fontSize: 17, fontWeight: '700' },
 
   rowCenter:    { flex: 1, gap: 3 },
-  rowName:      { fontSize: 15, fontWeight: '500', color: C.dark },
+  rowName:      { fontSize: 15, fontWeight: '500', color: C.white },
   bold:         { fontWeight: '700' },
   rowSub:       { fontSize: 13, color: C.muted },
-  rowSubUnread: { color: C.dark, fontWeight: '500' },
+  rowSubUnread: { color: C.white, fontWeight: '500' },
   rowRight:     { alignItems: 'flex-end', gap: 5, minWidth: 44 },
   rowTime:      { fontSize: 11, color: C.muted },
   memberCount:  { fontSize: 11, color: C.muted },
@@ -467,7 +470,7 @@ const styles = StyleSheet.create({
 
   sectionLabel: { fontSize: 11, fontWeight: '700', color: C.muted, paddingHorizontal: PAD, paddingTop: 14, paddingBottom: 4, letterSpacing: 0.5 },
 
-  emptyTitle:   { fontSize: 16, fontWeight: '700', color: C.dark },
+  emptyTitle:   { fontSize: 16, fontWeight: '700', color: C.white },
   emptyText:    { fontSize: 13, color: C.muted, textAlign: 'center' },
   emptyBtn:     { marginTop: 8, backgroundColor: C.accent, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10 },
   emptyBtnText: { color: '#FFF', fontWeight: '700', fontSize: 14 },

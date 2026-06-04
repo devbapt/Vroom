@@ -19,13 +19,15 @@ import { supabase } from '../supabaseClient';
 // ─── Design tokens ────────────────────────────────────────────────────────────
 
 const C = {
-  bg:       '#FFFFFF',
-  dark:     '#121212',
-  accent:   '#D91D2F',
-  muted:    '#8E8E93',
-  border:   '#F0F0F0',
-  inputBg:  '#F7F7F7',
-  rowHover: '#FAFAFA',
+  bg:       '#140102',
+  dark:     '#140102',
+  accent:   '#E50914',
+  muted:    'rgba(255,255,255,0.45)',
+  border:   'rgba(255,255,255,0.12)',
+  inputBg:  '#1F0808',
+  rowHover: '#2A0A0A',
+  white:    '#FFFFFF',
+  whiteSoft:'rgba(255,255,255,0.7)',
 };
 
 const PAD = 16;
@@ -211,7 +213,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 17,
     fontWeight: '700',
-    color: C.dark,
+    color: C.white,
   },
 
   // Search
@@ -226,8 +228,8 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: 'transparent',
   },
-  searchBarFocused: { borderColor: C.accent, backgroundColor: C.bg },
-  searchInput: { flex: 1, fontSize: 15, color: C.dark },
+  searchBarFocused: { borderColor: C.accent, backgroundColor: '#2A0A0A' },
+  searchInput: { flex: 1, fontSize: 15, color: C.white },
 
   // List
   list: { paddingHorizontal: PAD, paddingBottom: 32 },
@@ -244,7 +246,7 @@ const styles = StyleSheet.create({
   avatarFallback:{ backgroundColor: '#1A1A1A', justifyContent: 'center', alignItems: 'center' },
   avatarText:    { color: '#FFF', fontSize: 16, fontWeight: '700' },
   info:     { flex: 1, gap: 2 },
-  username: { fontSize: 15, fontWeight: '700', color: C.dark },
+  username: { fontSize: 15, fontWeight: '700', color: C.white },
   fullName: { fontSize: 12, color: C.muted },
 
   // Empty state
@@ -255,7 +257,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
     gap: 8,
   },
-  emptyTitle:    { fontSize: 17, fontWeight: '700', color: C.dark, marginTop: 8 },
+  emptyTitle:    { fontSize: 17, fontWeight: '700', color: C.white, marginTop: 8 },
   emptySubtitle: { fontSize: 13, color: C.muted, textAlign: 'center' },
 
   // Suggestion pills
@@ -268,5 +270,5 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: C.border,
   },
-  pillText: { fontSize: 13, color: C.dark, fontWeight: '500' },
+  pillText: { fontSize: 13, color: C.whiteSoft, fontWeight: '500' },
 });

@@ -4,22 +4,23 @@ import {
   Text,
   StyleSheet,
   Pressable,
-  SafeAreaView,
   ScrollView,
   Switch,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../supabaseClient';
 import { useAppContext } from '../context/AppContext';
 import { getTranslation, Language } from '../i18n';
 
 const VROOM_COLORS = {
-  bg: '#FFFFFF',
-  dark: '#140102',
-  accent: '#E50914',
-  muted: '#8E8E93',
-  fieldBg: 'rgba(20, 1, 2, 0.05)',
-  border: '#EEEEEE',
+  bg:      '#140102',
+  dark:    '#140102',
+  accent:  '#E50914',
+  muted:   'rgba(255,255,255,0.45)',
+  fieldBg: 'rgba(255,255,255,0.07)',
+  border:  'rgba(255,255,255,0.12)',
+  card:    '#1F0808',
 };
 
 const CONTAINER_PADDING = 16;
@@ -45,7 +46,7 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
       {/* Header */}
       <View style={styles.header}>
         <Pressable onPress={() => navigation.goBack()} hitSlop={15}>
-          <Ionicons name="chevron-down" size={30} color={VROOM_COLORS.dark} />
+          <Ionicons name="chevron-down" size={30} color="#FFFFFF" />
         </Pressable>
         <Text style={styles.headerTitle}>{t.settings.title}</Text>
         <View style={{ width: 30 }} />
@@ -219,7 +220,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 0.5,
     borderBottomColor: VROOM_COLORS.border,
   },
-  headerTitle: { fontSize: 15, fontWeight: '600', color: VROOM_COLORS.dark },
+  headerTitle: { fontSize: 15, fontWeight: '600', color: '#FFFFFF' },
   scrollContent: { paddingVertical: 20 },
   section: { marginBottom: 26 },
   sectionTitle: {
@@ -231,7 +232,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   sectionContent: {
-    backgroundColor: VROOM_COLORS.bg,
+    backgroundColor: VROOM_COLORS.card,
     borderTopWidth: 0.5,
     borderBottomWidth: 0.5,
     borderTopColor: VROOM_COLORS.border,
@@ -245,7 +246,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: CONTAINER_PADDING,
   },
   settingInfo: { flex: 1, marginRight: 12 },
-  settingLabel: { fontSize: 14, fontWeight: '500', color: VROOM_COLORS.dark, marginBottom: 2 },
+  settingLabel: { fontSize: 14, fontWeight: '500', color: '#FFFFFF', marginBottom: 2 },
   settingHint: { fontSize: 11, color: VROOM_COLORS.muted },
   divider: {
     height: 0.5,

@@ -4,23 +4,25 @@ import {
   Text,
   StyleSheet,
   Pressable,
-  SafeAreaView,
   ScrollView,
   FlatList,
   Dimensions,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
 const { width } = Dimensions.get('window');
 
 // --- Colors ---
 const VROOM_COLORS = {
-  bg: '#FFFFFF',
-  dark: '#140102',
-  accent: '#E50914',
-  muted: '#8E8E93',
-  fieldBg: 'rgba(20, 1, 2, 0.05)',
-  border: '#EEEEEE',
+  bg:      '#140102',
+  dark:    '#140102',
+  accent:  '#E50914',
+  muted:   'rgba(255,255,255,0.45)',
+  fieldBg: '#1F0808',
+  border:  'rgba(255,255,255,0.12)',
+  white:   '#FFFFFF',
+  whiteSoft: 'rgba(255,255,255,0.7)',
 };
 
 const CONTAINER_PADDING = 16;
@@ -110,7 +112,7 @@ export default function ActivityScreen({ navigation }: ActivityScreenProps) {
       {/* === HEADER === */}
       <View style={styles.header}>
         <Pressable onPress={() => navigation.goBack()} hitSlop={15}>
-          <Ionicons name="chevron-down" size={32} color={VROOM_COLORS.dark} />
+          <Ionicons name="chevron-down" size={32} color={VROOM_COLORS.white} />
         </Pressable>
         <Text style={styles.headerTitle}>Activity</Text>
         <View style={{ width: 32 }} />
@@ -148,7 +150,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: VROOM_COLORS.dark,
+    color: VROOM_COLORS.white,
   },
 
   // === LIST ===
@@ -178,7 +180,7 @@ const styles = StyleSheet.create({
   activityUser: {
     fontSize: 14,
     fontWeight: '600',
-    color: VROOM_COLORS.dark,
+    color: VROOM_COLORS.white,
     marginBottom: 2,
   },
   activityAction: {

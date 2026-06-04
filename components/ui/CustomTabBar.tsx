@@ -32,12 +32,9 @@ function CustomTabBar({ state, navigation }: BottomTabBarProps) {
   const { user } = useAppContext();
   const unreadCount = useUnreadCount(user?.id ?? '');
 
-  const activeRouteName = state.routes[state.index]?.name ?? '';
-  const isDark = activeRouteName === 'Home';
-
-  const bgColor       = isDark ? '#140102' : '#FFFFFF';
-  const borderColor   = isDark ? 'rgba(255,255,255,0.08)' : '#EEEEEE';
-  const inactiveColor = isDark ? 'rgba(255,255,255,0.45)' : '#8E8E93';
+  const bgColor       = '#140102';
+  const borderColor   = 'rgba(255,255,255,0.08)';
+  const inactiveColor = 'rgba(255,255,255,0.45)';
 
   return (
     <View
