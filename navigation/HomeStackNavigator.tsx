@@ -4,11 +4,13 @@ import { createStackNavigator, CardStyleInterpolators, TransitionPresets } from 
 import HomeScreen from '../screens/HomeScreen';
 import CreatePostScreen from '../screens/CreatePostScreen';
 import UserProfileScreen from '../screens/UserProfileScreen';
+import PostDetailScreen from '../screens/PostDetailScreen';
 
 export type HomeStackParamList = {
   HomeFeed: undefined;
   CreatePost: undefined;
   UserProfile: { userId: string; username: string };
+  PostDetail: { id: string; name: string; image: string; description?: string; date?: string };
 };
 
 const Stack = createStackNavigator<HomeStackParamList>();
@@ -54,6 +56,7 @@ export default function HomeStackNavigator() {
         component={CreatePostScreen}
         options={MODAL_TRANSITION}
       />
+      <Stack.Screen name="PostDetail" component={PostDetailScreen} />
     </Stack.Navigator>
   );
 }

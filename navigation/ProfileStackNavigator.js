@@ -9,6 +9,9 @@ import SavedScreen         from '../screens/SavedScreen';
 import CreateStoryScreen   from '../screens/CreateStoryScreen';
 import CreatePostScreen    from '../screens/CreatePostScreen';
 import ChangePasswordScreen from '../screens/ChangePasswordScreen';
+import AboutScreen         from '../screens/AboutScreen';
+import LegalScreen         from '../screens/LegalScreen';
+import PostDetailScreen    from '../screens/PostDetailScreen';
 
 const Stack = createStackNavigator();
 
@@ -34,6 +37,9 @@ export default function ProfileStackNavigator() {
       <Stack.Screen name="Activity"        component={ActivityScreen} />
       <Stack.Screen name="Saved"           component={SavedScreen} />
       <Stack.Screen name="ChangePassword"  component={ChangePasswordScreen} />
+      <Stack.Screen name="About"           component={AboutScreen} />
+      <Stack.Screen name="Legal"           component={LegalScreen} />
+      <Stack.Screen name="PostDetail"      component={PostDetailScreen} />
 
       {/* Modaux — slide from bottom */}
       <Stack.Screen name="AddVehicle"      component={AddVehicleScreen}     options={MODAL} />

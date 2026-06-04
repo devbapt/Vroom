@@ -93,6 +93,8 @@ export default function SignupScreen({ navigation }: { navigation: any }) {
   const [emailError, setEmailError] = useState<string | null>(null);
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [confirmError, setConfirmError] = useState<string | null>(null);
+  const [consentAccepted, setConsentAccepted] = useState(false);
+  const [rgpdExpanded, setRgpdExpanded] = useState(false);
 
   const showAlert = (message: string) => {
     Platform.OS === 'web' ? alert(message) : Alert.alert('Erreur', message);
@@ -110,6 +112,10 @@ export default function SignupScreen({ navigation }: { navigation: any }) {
     setConfirmError(cErr);
 
     if (uErr || eErr || pErr || cErr) return;
+    if (!consentAccepted) {
+      showAlert('Veuillez accepter les CGU et la politique de confidentialité pour continuer.');
+      return;
+    }
 
     setLoading(true);
     try {
@@ -309,6 +315,56 @@ export default function SignupScreen({ navigation }: { navigation: any }) {
             </View>
             {confirmError && <Text style={styles.errorText}>{confirmError}</Text>}
 
+            {/* ── Bloc RGPD (recommandé CNIL : information à plusieurs niveaux) ── */}
+            <View style={styles.rgpdBox}>
+              <View style={styles.rgpdHeader}>
+                <Ionicons name="shield-checkmark-outline" size={16} color={COLORS.accent} />
+                <Text style={styles.rgpdTitle}>Vos données personnelles</Text>
+                <Pressable onPress={() => setRgpdExpanded(v => !v)} hitSlop={8}>
+                  <Ionicons name={rgpdExpanded ? 'chevron-up' : 'chevron-down'} size={14} color={COLORS.textMuted} />
+                </Pressable>
+              </View>
+              <Text style={styles.rgpdSummary}>
+                Vroom SAS collecte votre email, pseudo et photo de profil pour créer votre compte.
+                Données conservées jusqu'à suppression du compte.
+              </Text>
+              {rgpdExpanded && (
+                <View style={styles.rgpdDetails}>
+                  <Text style={styles.rgpdRow}>
+                    <Text style={styles.rgpdBold}>Responsable :</Text> Vroom SAS
+                  </Text>
+                  <Text style={styles.rgpdRow}>
+                    <Text style={styles.rgpdBold}>Finalités :</Text> Profil, feed, messagerie, carte
+                  </Text>
+                  <Text style={styles.rgpdRow}>
+                    <Text style={styles.rgpdBold}>Conservation :</Text> Compte + 30j · Messages 2 ans · Logs 12 mois
+                  </Text>
+                  <Text style={styles.rgpdRow}>
+                    <Text style={styles.rgpdBold}>Vos droits :</Text> Accès, rectification, suppression, portabilité
+                  </Text>
+                  <Text style={styles.rgpdRow}>
+                    <Text style={styles.rgpdBold}>Contact DPO :</Text> dpo@vroom-app.fr
+                  </Text>
+                  <Text style={styles.rgpdRow}>
+                    <Text style={styles.rgpdBold}>Réclamation :</Text> www.cnil.fr
+                  </Text>
+                </View>
+              )}
+            </View>
+
+            {/* ── Checkbox de consentement ── */}
+            <Pressable style={styles.consentRow} onPress={() => setConsentAccepted(v => !v)}>
+              <View style={[styles.checkbox, consentAccepted && styles.checkboxChecked]}>
+                {consentAccepted && <Ionicons name="checkmark" size={13} color="#FFF" />}
+              </View>
+              <Text style={styles.consentText}>
+                J'accepte les{' '}
+                <Text style={styles.consentLink}>CGU</Text>
+                {' '}et la{' '}
+                <Text style={styles.consentLink}>politique de confidentialité</Text>
+              </Text>
+            </Pressable>
+
             {/* Bouton S'inscrire */}
             <Pressable
               onPress={handleSignup}
@@ -392,4 +448,31 @@ const styles = StyleSheet.create({
   footer: { flexDirection: 'row', justifyContent: 'center', marginTop: 28 },
   footerText: { color: COLORS.textMuted, fontSize: 14 },
   loginText: { color: COLORS.accent, fontSize: 14, fontWeight: 'bold' },
+
+  // RGPD
+  rgpdBox: {
+    marginTop: 16, marginBottom: 4,
+    backgroundColor: 'rgba(229,9,20,0.07)',
+    borderRadius: 10, borderWidth: 1,
+    borderColor: 'rgba(229,9,20,0.25)',
+    padding: 12,
+  },
+  rgpdHeader: { flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: 6 },
+  rgpdTitle:  { flex: 1, fontSize: 12, fontWeight: '700', color: COLORS.accent },
+  rgpdSummary:{ fontSize: 11, color: COLORS.textMuted, lineHeight: 16 },
+  rgpdDetails:{ marginTop: 10, gap: 5 },
+  rgpdRow:    { fontSize: 11, color: COLORS.textMuted, lineHeight: 16 },
+  rgpdBold:   { fontWeight: '700', color: COLORS.text },
+
+  // Checkbox consentement
+  consentRow:     { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginTop: 12, marginBottom: 4 },
+  checkbox:       {
+    width: 20, height: 20, borderRadius: 5,
+    borderWidth: 1.5, borderColor: COLORS.border,
+    justifyContent: 'center', alignItems: 'center',
+    marginTop: 1, flexShrink: 0,
+  },
+  checkboxChecked:{ backgroundColor: COLORS.accent, borderColor: COLORS.accent },
+  consentText:    { flex: 1, fontSize: 12, color: COLORS.textMuted, lineHeight: 17 },
+  consentLink:    { color: COLORS.accent, fontWeight: '600' },
 });

@@ -145,7 +145,7 @@ export default function CommentsSheet({ postId, visible, onClose, onCommentCount
   }, []);
 
   useEffect(() => {
-    if (visible) {
+    if (visible && postId) {
       fetchComments();
       Animated.spring(slideAnim, {
         toValue: 0,
@@ -153,7 +153,7 @@ export default function CommentsSheet({ postId, visible, onClose, onCommentCount
         friction: 11,
         useNativeDriver: true,
       }).start();
-    } else {
+    } else if (!visible) {
       Animated.timing(slideAnim, {
         toValue: 700,
         duration: 260,
@@ -164,7 +164,9 @@ export default function CommentsSheet({ postId, visible, onClose, onCommentCount
         setReplyTo(null);
       });
     }
-  }, [visible]);
+    // postId dans les deps : si visible est déjà true et postId change (réouverture
+    // rapide), le fetch se relance avec le bon ID sans attendre une transition visible
+  }, [visible, postId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchComments = async () => {
     if (!postId) return;
