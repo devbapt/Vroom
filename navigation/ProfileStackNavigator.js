@@ -11,7 +11,9 @@ import CreatePostScreen    from '../screens/CreatePostScreen';
 import ChangePasswordScreen from '../screens/ChangePasswordScreen';
 import AboutScreen         from '../screens/AboutScreen';
 import LegalScreen         from '../screens/LegalScreen';
-import PostDetailScreen    from '../screens/PostDetailScreen';
+import PostDetailScreen          from '../screens/PostDetailScreen';
+import VehiclePlateSearchScreen  from '../screens/VehiclePlateSearchScreen';
+import CertificationScreen       from '../screens/CertificationScreen';
 
 const Stack = createStackNavigator();
 
@@ -39,7 +41,9 @@ export default function ProfileStackNavigator() {
       <Stack.Screen name="ChangePassword"  component={ChangePasswordScreen} />
       <Stack.Screen name="About"           component={AboutScreen} />
       <Stack.Screen name="Legal"           component={LegalScreen} />
-      <Stack.Screen name="PostDetail"      component={PostDetailScreen} />
+      <Stack.Screen name="PostDetail"       component={PostDetailScreen} />
+      <Stack.Screen name="VehiclePlateSearch" component={VehiclePlateSearchScreen}  options={{ ...TransitionPresets.ModalSlideFromBottomIOS }} />
+      <Stack.Screen name="Certification"      component={CertificationScreen}       options={{ ...TransitionPresets.ModalSlideFromBottomIOS }} />
 
       {/* Modaux — slide from bottom */}
       <Stack.Screen name="AddVehicle"      component={AddVehicleScreen}     options={MODAL} />

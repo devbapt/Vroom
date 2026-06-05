@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
+import VerifiedBadge from '../components/ui/VerifiedBadge';
 import * as ImagePicker from 'expo-image-picker';
 import { Image as ExpoImage } from 'expo-image';
 import { Ionicons, Feather } from '@expo/vector-icons';
@@ -65,6 +66,8 @@ interface GarageCar {
   images: string[];
   specs: { km: string; motor: string; color: string; gearbox: string };
   history: string;
+  estCertifie: boolean;
+  pendingCertification?: boolean;
 }
 
 // =====================================================================
@@ -124,6 +127,7 @@ export default function ProfileScreen() {
             gearbox: v.transmission ?? '—',
           },
           history: v.notes ?? '',
+          estCertifie: v.est_certifie ?? false,
         })));
       });
   }, [user?.id]);
@@ -297,7 +301,7 @@ export default function ProfileScreen() {
           <View style={styles.dragHandle} />
           <Text style={styles.sheetTitle}>Ajouter du contenu</Text>
           <Pressable style={({ pressed }) => [styles.sheetItem, pressed && { backgroundColor: C.bgElevated }]}
-            onPress={() => { closeAddSheet(); navigation.navigate('AddVehicle'); }}>
+            onPress={() => { closeAddSheet(); navigation.navigate('VehiclePlateSearch'); }}>
             <View style={[styles.sheetIcon, { backgroundColor: '#2A0A0A' }]}>
               <Ionicons name="car-sport-outline" size={18} color={C.white} />
             </View>
@@ -540,6 +544,22 @@ function ProfileGridView({
                 <Pressable key={car.id} style={styles.card} onPress={() => onCarPress(car.id)}>
                   <ExpoImage source={car.image} style={StyleSheet.absoluteFill}
                     contentFit="cover" placeholder={FALLBACK} cachePolicy="memory-disk" />
+
+                  {/* Badge certifié ou en attente */}
+                  {car.estCertifie ? (
+                    <View style={styles.cardBadge}>
+                      <VerifiedBadge variant="certified" size="sm" />
+                    </View>
+                  ) : (
+                    <Pressable
+                      style={styles.certifyBtn}
+                      onPress={() => onNavigate('Certification', { vehiculeId: car.id, vehiculeName: car.name })}
+                      hitSlop={4}
+                    >
+                      <Ionicons name="shield-outline" size={11} color="rgba(255,255,255,0.7)" />
+                    </Pressable>
+                  )}
+
                   <LinearGradient
                     colors={['transparent', 'rgba(0,0,0,0.82)']}
                     style={styles.cardOverlay}
@@ -883,6 +903,16 @@ const styles = StyleSheet.create({
     position: 'absolute', top: 6, left: 6,
     width: 22, height: 22, borderRadius: 11,
     backgroundColor: 'rgba(0,0,0,0.55)',
+    justifyContent: 'center', alignItems: 'center',
+  },
+  cardBadge: {
+    position: 'absolute', top: 6, right: 6,
+  },
+  certifyBtn: {
+    position: 'absolute', top: 6, right: 6,
+    width: 22, height: 22, borderRadius: 11,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    borderWidth: 0.5, borderColor: 'rgba(255,255,255,0.2)',
     justifyContent: 'center', alignItems: 'center',
   },
   cardMenuBtn: {

@@ -1,4 +1,5 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
+import * as Crypto from 'expo-crypto';
 import {
   View,
   Text,
@@ -16,7 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image as ExpoImage } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { useAppContext } from '../context';
 import { getTranslation } from '../i18n';
 import { supabase } from '../supabaseClient';
@@ -202,10 +203,16 @@ function BrandInput({
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function AddVehicleScreen() {
-  const insets = useSafeAreaInsets();
+  const insets     = useSafeAreaInsets();
   const navigation = useNavigation<any>();
+  const route      = useRoute<any>();
   const { user, language } = useAppContext();
   const t = getTranslation(language).garage;
+
+  // Données pré-remplies depuis VehiclePlateSearchScreen
+  const prefill = route.params?.prefill as {
+    brand?: string; model?: string; year?: string; plateNormalized?: string;
+  } | undefined;
 
   const FUEL_OPTIONS: ChipOption<VehicleFuel>[] = [
     { value: 'gasoline', label: t.fuel_gasoline },
@@ -217,10 +224,21 @@ export default function AddVehicleScreen() {
   // Identity
   const [imageUri, setImageUri] = useState('');
   const [imageBase64, setImageBase64] = useState<string | null>(null);
-  const [brand, setBrand] = useState('');
-  const [model, setModel] = useState('');
-  const [year, setYear] = useState('');
+  const [brand, setBrand] = useState(prefill?.brand ?? '');
+  const [model, setModel] = useState(prefill?.model ?? '');
+  const [year, setYear]   = useState(prefill?.year  ?? '');
   const [nickname, setNickname] = useState('');
+
+  // Plaque (optionnelle, stockée sous forme hachée)
+  const [plateRaw, setPlateRaw] = useState(prefill?.plateNormalized ?? '');
+
+  // Pré-remplissage si on revient en arrière et qu'on ouvre de nouveau
+  useEffect(() => {
+    if (prefill?.brand)           setBrand(prefill.brand);
+    if (prefill?.model)           setModel(prefill.model);
+    if (prefill?.year)            setYear(prefill.year);
+    if (prefill?.plateNormalized) setPlateRaw(prefill.plateNormalized);
+  }, [prefill?.brand, prefill?.model, prefill?.year, prefill?.plateNormalized]);
 
   // Technical
   const [power, setPower] = useState('');
@@ -293,6 +311,15 @@ export default function AddVehicleScreen() {
         publicUrl = urlData.publicUrl;
       }
 
+      // Hacher la plaque (SHA-256) — jamais en clair en base
+      let plateHash: string | null = null;
+      if (plateRaw.trim()) {
+        plateHash = await Crypto.digestStringAsync(
+          Crypto.CryptoDigestAlgorithm.SHA256,
+          plateRaw.trim().toUpperCase()
+        );
+      }
+
       const { error: insertError } = await supabase.from('garage_vehicles').insert({
         user_id: user.id,
         image_url: publicUrl,
@@ -310,9 +337,28 @@ export default function AddVehicleScreen() {
         acquired_at: acquiredAt.trim() || null,
         status: status ?? null,
         notes: notes.trim() || null,
+        plaque_hash: plateHash,
       });
 
-      if (insertError) throw insertError;
+      if (insertError) {
+        // Code 23505 = violation contrainte UNIQUE (plaque déjà enregistrée)
+        if (insertError.code === '23505' && insertError.message.includes('plaque_hash')) {
+          Alert.alert(
+            'Véhicule déjà enregistré',
+            'Cette plaque est déjà associée à un autre profil Vroom.\n\nSouhaitez-vous revendiquer la propriété ?',
+            [
+              { text: 'Annuler', style: 'cancel' },
+              {
+                text: 'Revendiquer',
+                // La plaque appartient à quelqu'un d'autre → flow certification
+                onPress: () => navigation.navigate('VehiclePlateSearch'),
+              },
+            ]
+          );
+          return;
+        }
+        throw insertError;
+      }
 
       navigation.goBack();
     } catch (err: any) {
