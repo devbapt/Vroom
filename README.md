@@ -237,6 +237,9 @@ Flow complet de vérification en 4 étapes : instructions (défi photo — papie
 ### Recherche de véhicule par plaque d'immatriculation
 Écran de saisie de la plaque au format SIV (formatage automatique `AB-123-CD` en temps réel) qui appelle une Edge Function Supabase (`fetch-vehicle-info`). Le résultat est affiché sous forme de carte avec une plaque stylisée (bande bleue F + fond blanc), un skeleton loader animé pendant le chargement, et deux choix : confirmer pour pré-remplir automatiquement le formulaire d'ajout de véhicule (marque, modèle, année, plaque), ou saisir manuellement. Le bouton "Ajouter un véhicule" du profil pointe désormais vers cet écran en premier.
 
+### Vérification VIN et anti-doublon
+Champ VIN (numéro de châssis) optionnel dans le formulaire d'ajout de véhicule, vérifié via l'API publique et gratuite **NHTSA vPIC** (`vpic.nhtsa.dot.gov`) : la marque/modèle/année décodés sont comparés à la saisie utilisateur pour signaler une incohérence avant l'ajout. La plaque et le VIN sont hachés (SHA-256) et stockés dans des colonnes uniques (`plaque_hash`, `vin_hash`) sur `garage_vehicles` — un même véhicule ne peut donc pas être enregistré par deux comptes Vroom différents. En cas de doublon détecté, l'utilisateur est invité à contacter le support plutôt que de se voir proposer une "revendication" automatique non implémentée.
+
 ### Internationalisation
 Système de traductions maison (`i18n.ts`) couvrant 4 namespaces : `profile`, `settings`, `post`, `garage`. Langue persistée dans le contexte global, modifiable depuis les Paramètres (FR/EN).
 

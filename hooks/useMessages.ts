@@ -14,6 +14,7 @@ export interface Message {
   conversation_id: string;
   sender_id: string;
   content: string;
+  image_url: string | null;
   created_at: string;
   is_read: boolean;
   is_liked: boolean;
@@ -144,15 +145,23 @@ export function useMessages(conversationId: string, currentUserId: string) {
   }, [conversationId, currentUserId]);
 
   // ── send ──────────────────────────────────────────────────────────────────
-  const sendMessage = useCallback(async (content: string): Promise<void> => {
+  // Renvoie true en cas de succès — l'appelant décide quoi faire du brouillon en cas d'échec.
+  const sendMessage = useCallback(async (content: string, imageUrl?: string | null): Promise<boolean> => {
     const trimmed = content.trim();
-    if (!trimmed) return;
-    const { data } = await supabase
+    if (!trimmed && !imageUrl) return false;
+    const { data, error } = await supabase
       .from('messages')
-      .insert({ conversation_id: conversationId, sender_id: currentUserId, content: trimmed })
+      .insert({
+        conversation_id: conversationId,
+        sender_id: currentUserId,
+        content: trimmed,
+        image_url: imageUrl ?? null,
+      })
       .select()
       .single();
-    if (data) setMessages((prev) => [data as Message, ...prev]);
+    if (error || !data) return false;
+    setMessages((prev) => [data as Message, ...prev]);
+    return true;
   }, [conversationId, currentUserId]);
 
   // ── like (toggle) ─────────────────────────────────────────────────────────
@@ -253,6 +262,87 @@ export function useUnreadCount(currentUserId: string): number {
   }, [currentUserId]);
 
   return count;
+}
+
+// ─── useGroupMessages ─────────────────────────────────────────────────────────
+// Handles messaging for a group conversation (table `group_messages`).
+
+export interface GroupMessage {
+  id: string;
+  group_id: string;
+  sender_id: string;
+  content: string;
+  created_at: string;
+  is_deleted: boolean;
+}
+
+export function useGroupMessages(groupId: string, currentUserId: string) {
+  const [messages, setMessages] = useState<GroupMessage[]>([]);
+  const [senderProfiles, setSenderProfiles] = useState<Record<string, ChatUser>>({});
+  const [loading, setLoading] = useState(true);
+
+  const fetchProfilesFor = useCallback(async (senderIds: string[]) => {
+    const missing = senderIds.filter((id) => id && !senderProfiles[id]);
+    if (missing.length === 0) return;
+    const { data } = await supabase
+      .from('profiles')
+      .select('id, username, avatar_url')
+      .in('id', missing);
+    if (!data || data.length === 0) return;
+    setSenderProfiles((prev) => {
+      const next = { ...prev };
+      for (const p of data) next[p.id] = { id: p.id, username: p.username ?? '', avatar_url: p.avatar_url };
+      return next;
+    });
+  }, [senderProfiles]);
+
+  const fetchMessages = useCallback(async () => {
+    const { data } = await supabase
+      .from('group_messages')
+      .select('*')
+      .eq('group_id', groupId)
+      .order('created_at', { ascending: false });
+    if (data) {
+      setMessages(data as GroupMessage[]);
+      await fetchProfilesFor([...new Set(data.map((m: any) => m.sender_id as string))]);
+    }
+    setLoading(false);
+  }, [groupId, fetchProfilesFor]);
+
+  const sendMessage = useCallback(async (content: string): Promise<boolean> => {
+    const trimmed = content.trim();
+    if (!trimmed) return false;
+    const { data, error } = await supabase
+      .from('group_messages')
+      .insert({ group_id: groupId, sender_id: currentUserId, content: trimmed })
+      .select()
+      .single();
+    if (error || !data) return false;
+    setMessages((prev) => [data as GroupMessage, ...prev]);
+    return true;
+  }, [groupId, currentUserId]);
+
+  useEffect(() => {
+    fetchMessages();
+
+    const channel = supabase
+      .channel(`group:${groupId}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'group_messages', filter: `group_id=eq.${groupId}` },
+        (payload) => {
+          const incoming = payload.new as GroupMessage;
+          if (incoming.sender_id === currentUserId) return;
+          setMessages((prev) => [incoming, ...prev]);
+          fetchProfilesFor([incoming.sender_id]);
+        }
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
+  }, [groupId, currentUserId, fetchMessages, fetchProfilesFor]);
+
+  return { messages, senderProfiles, loading, sendMessage };
 }
 
 // ─── findOrCreateConversation ─────────────────────────────────────────────────

@@ -86,8 +86,12 @@ export default function AppNavigator() {
         }}
       >
         {isRecovery ? (
-          // RESET PASSWORD ➡️ lien email cliqué → changer le mot de passe
-          <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} />
+          // RESET PASSWORD ➡️ lien email cliqué → changer le mot de passe sans le connaître
+          <Stack.Screen
+            name="ChangePassword"
+            component={ChangePasswordScreen}
+            initialParams={{ isRecoveryMode: true }}
+          />
         ) : session && session.user ? (
           showWelcome ? (
             // NOUVEL INSCRIT ➡️ Écran de bienvenue 2.5s puis MainApp

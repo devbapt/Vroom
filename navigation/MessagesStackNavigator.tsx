@@ -3,6 +3,7 @@ import { createStackNavigator, CardStyleInterpolators, TransitionPresets } from 
 import MessagesScreen    from '../screens/MessagesScreen';
 import ChatScreen        from '../screens/ChatScreen';
 import CreateGroupScreen from '../screens/CreateGroupScreen';
+import GroupDetailScreen from '../screens/GroupDetailScreen';
 import type { ChatUser } from '../hooks/useMessages';
 
 export type MessagesStackParamList = {
@@ -26,6 +27,7 @@ export default function MessagesStackNavigator() {
     <Stack.Navigator screenOptions={SCREEN_BASE}>
       <Stack.Screen name="ConversationList" component={MessagesScreen} />
       <Stack.Screen name="Chat"             component={ChatScreen} />
+      <Stack.Screen name="GroupDetail"       component={GroupDetailScreen} />
       {/* Slide from bottom — création de groupe */}
       <Stack.Screen
         name="CreateGroup"

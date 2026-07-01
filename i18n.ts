@@ -148,6 +148,43 @@ export interface Translations {
     help_section: string;
     language_hint: string;
   };
+  map: {
+    filterAll: string;
+    filterEvents: string;
+    filterRoutes: string;
+    typeEvent: string;
+    typeRoute: string;
+    newPoint: string;
+    titleField: string;
+    titlePlaceholder: string;
+    descriptionField: string;
+    descriptionPlaceholder: string;
+    eventDate: string;
+    eventDatePlaceholder: string;
+    photoOptional: string;
+    useCurrentLocation: string;
+    pickOnMap: string;
+    publish: string;
+    publishing: string;
+    getDirections: string;
+    openInGoogleMaps: string;
+    openInWaze: string;
+    deletePoint: string;
+    deleteConfirmTitle: string;
+    deleteConfirmMsg: string;
+    cancel: string;
+    delete: string;
+    permissionTitle: string;
+    permissionMsg: string;
+    titleRequired: string;
+    titleRequiredMsg: string;
+    locationRequired: string;
+    locationRequiredMsg: string;
+    errorTitle: string;
+    errorMsg: string;
+    by: string;
+    emptyHint: string;
+  };
 }
 
 const FR: Translations = {
@@ -293,6 +330,43 @@ const FR: Translations = {
     terms_hint: 'Nos politiques et conditions',
     sign_out: 'Se déconnecter',
   },
+  map: {
+    filterAll: 'Tous',
+    filterEvents: 'Événements',
+    filterRoutes: 'Routes',
+    typeEvent: 'Événement',
+    typeRoute: 'Route sympa',
+    newPoint: 'Nouveau point',
+    titleField: 'TITRE *',
+    titlePlaceholder: 'Cars & Coffee, Col de Turini…',
+    descriptionField: 'DESCRIPTION (optionnel)',
+    descriptionPlaceholder: 'Décris le lieu, l\'ambiance, ce qu\'il faut savoir…',
+    eventDate: 'DATE (optionnel)',
+    eventDatePlaceholder: '15/08/2026, tous les samedis…',
+    photoOptional: 'PHOTO (optionnel)',
+    useCurrentLocation: 'Ma position actuelle',
+    pickOnMap: 'Choisir sur la carte',
+    publish: 'PUBLIER LE POINT',
+    publishing: '...',
+    getDirections: 'Itinéraire',
+    openInGoogleMaps: 'Ouvrir dans Google Maps',
+    openInWaze: 'Ouvrir dans Waze',
+    deletePoint: 'Supprimer',
+    deleteConfirmTitle: 'Supprimer ce point ?',
+    deleteConfirmMsg: 'Cette action est définitive.',
+    cancel: 'Annuler',
+    delete: 'Supprimer',
+    permissionTitle: 'Localisation désactivée',
+    permissionMsg: 'Active la localisation dans les réglages pour voir les points près de toi.',
+    titleRequired: 'Titre requis',
+    titleRequiredMsg: 'Donne un titre à ton point.',
+    locationRequired: 'Position requise',
+    locationRequiredMsg: 'Active ta position ou choisis un point sur la carte.',
+    errorTitle: 'Erreur',
+    errorMsg: 'Impossible de publier ce point.',
+    by: 'par',
+    emptyHint: 'Aucun point pour l\'instant — sois le premier à en ajouter un !',
+  },
 };
 
 const EN: Translations = {
@@ -437,6 +511,43 @@ const EN: Translations = {
     terms: 'Terms & Privacy',
     terms_hint: 'Our policies and terms',
     sign_out: 'Sign Out',
+  },
+  map: {
+    filterAll: 'All',
+    filterEvents: 'Events',
+    filterRoutes: 'Routes',
+    typeEvent: 'Event',
+    typeRoute: 'Nice route',
+    newPoint: 'New point',
+    titleField: 'TITLE *',
+    titlePlaceholder: 'Cars & Coffee, mountain pass…',
+    descriptionField: 'DESCRIPTION (optional)',
+    descriptionPlaceholder: 'Describe the place, the vibe, what to know…',
+    eventDate: 'DATE (optional)',
+    eventDatePlaceholder: 'Aug 15 2026, every Saturday…',
+    photoOptional: 'PHOTO (optional)',
+    useCurrentLocation: 'My current location',
+    pickOnMap: 'Pick on map',
+    publish: 'PUBLISH POINT',
+    publishing: '...',
+    getDirections: 'Get directions',
+    openInGoogleMaps: 'Open in Google Maps',
+    openInWaze: 'Open in Waze',
+    deletePoint: 'Delete',
+    deleteConfirmTitle: 'Delete this point?',
+    deleteConfirmMsg: 'This action is permanent.',
+    cancel: 'Cancel',
+    delete: 'Delete',
+    permissionTitle: 'Location disabled',
+    permissionMsg: 'Enable location in settings to see points near you.',
+    titleRequired: 'Title required',
+    titleRequiredMsg: 'Give your point a title.',
+    locationRequired: 'Location required',
+    locationRequiredMsg: 'Enable your location or pick a point on the map.',
+    errorTitle: 'Error',
+    errorMsg: 'Unable to publish this point.',
+    by: 'by',
+    emptyHint: 'No points yet — be the first to add one!',
   },
 };
 

@@ -2,6 +2,7 @@ import React from 'react';
 import { createStackNavigator, CardStyleInterpolators } from '@react-navigation/stack';
 import SearchScreen from '../screens/SearchScreen';
 import UserProfileScreen from '../screens/UserProfileScreen';
+import PostDetailScreen from '../screens/PostDetailScreen';
 
 const Stack = createStackNavigator();
 
@@ -17,6 +18,7 @@ export default function SearchStackNavigator() {
     >
       <Stack.Screen name="SearchHome" component={SearchScreen} />
       <Stack.Screen name="UserProfile" component={UserProfileScreen} />
+      <Stack.Screen name="PostDetail" component={PostDetailScreen} />
     </Stack.Navigator>
   );
 }

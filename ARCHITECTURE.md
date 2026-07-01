@@ -1,66 +1,59 @@
-# Vroom App - Architecture MVC et Standards Mobile
+# Vroom — Architecture technique
 
-## Architecture MVC
-
-### Model Layer (Context + Services)
-```
-context/AppContext.ts     - Global state (user, posts, highlights, notifications)
-services/ImageService.ts  - Image handling (picking, compression, upload)
-```
-
-### View Layer (Screens)
-```
-screens/
-  ProfileScreen.tsx       - User profile with posts & stories
-  HomeScreen.tsx         - Feed (to be implemented)
-  SearchScreen.tsx       - Search users & posts
-  MessagesScreen.tsx     - Direct messages
-  MapScreen.tsx          - Map view
-  ... + modals & detail screens
-```
-
-### Controller Layer (Navigation)
-```
-navigation/
-  AppNavigator.js        - Auth flow
-  MainNavigator.js       - Bottom tab navigation
-  ProfileStackNavigator.js - Profile feature flows
-```
+> Ce document décrit l'architecture réelle du code. Pour la présentation du projet, la justification des choix techniques et le guide de test, voir [README.md](./README.md).
 
 ---
 
-## Standards Mobile Réseau Social
+## Vue d'ensemble
 
-### Image Optimization
-- ✅ Compression: 60-70% size reduction
-- ✅ Cache policy: memory-disk caching
-- ✅ Lazy loading: via expo-image
-- ✅ Responsive sizing: aspect ratios preserved
-- ✅ Thumbnail generation: for grid previews
-
-### State Management
-- ✅ Global context for: user, posts, highlights, notifications
-- ✅ Local state for: UI interactions, form data
-- ✅ Callback pattern: parent-child component sync
-
-### Performance
-- ✅ FlatList/ScrollView optimization
-- ✅ Image caching (memory + disk)
-- ✅ Pagination ready (not implemented yet)
-- ✅ Safe area insets for notch support
-
-### User Experience
-- ✅ Modal transitions (slide animations)
-- ✅ Loading states with ActivityIndicator
-- ✅ Error handling with alerts
-- ✅ Empty states for screens
-- ✅ Pull-to-refresh (ready to implement)
-- ✅ Haptic feedback (ready to implement)
-
-### Security & Data
-- ⚠️ Mock data (ready for Supabase integration)
-- ⚠️ Image upload validation (size, format)
-- ⚠️ User authentication (Supabase integration exists)
+```
+Vroom/
+├── assets/                     # SVG (logo, typo), PNG
+├── components/
+│   ├── cine/                   # Composants du feed
+│   │   ├── CineDrivePost.tsx    - Carte de post plein écran (feed principal)
+│   │   ├── HUDStrip.tsx         - Bandeau de données de session par type de post
+│   │   ├── HomeHeader.tsx       - Header du feed (logo, blur étendu au notch)
+│   │   ├── StoriesBar.tsx       - Bandeau de stories
+│   │   ├── ActionStack.tsx      - Actions latérales (like, commenter, partager)
+│   │   ├── ChapterCard.tsx      - Carte de chapitre/highlight
+│   │   └── LiveStrip.tsx        - Bandeau live
+│   └── ui/
+│       ├── CustomTabBar.tsx     - Bottom tab bar custom
+│       └── VerifiedBadge.tsx    - Badge certifié/en attente (2 variantes, 2 tailles)
+├── context/
+│   ├── AppContext.tsx           - État global (user, langue, deletedPostIds, session)
+│   └── index.ts
+├── hooks/
+│   └── useMessages.ts           - Logique de messagerie (fetch, envoi, statut lu)
+├── navigation/
+│   ├── AppNavigator.js          - Root : Auth vs MainApp + thème dark sur NavigationContainer
+│   ├── MainNavigator.js         - Bottom tabs (5 onglets)
+│   ├── HomeStackNavigator.tsx   - Feed + PostDetail
+│   ├── ProfileStackNavigator.js - Profil, Garage, Certification, VehiclePlateSearch, Settings...
+│   ├── MessagesStackNavigator.tsx - Conversations 1-to-1 et groupes
+│   └── SearchStackNavigator.js  - Recherche utilisateurs/posts
+├── screens/                     # Un fichier par écran (29 écrans)
+│   ├── HomeScreen.tsx            - Feed plein écran paginé (dual-source)
+│   ├── ProfileScreen.tsx / UserProfileScreen.tsx
+│   ├── GarageScreen.tsx / AddVehicleScreen.tsx
+│   ├── CertificationScreen.tsx   - Flow de certification de propriété véhicule
+│   ├── VehiclePlateSearchScreen.tsx - Recherche par plaque → pré-remplissage garage
+│   ├── CreatePostScreen.tsx / CreateStoryScreen.tsx / CreateGroupScreen.tsx
+│   ├── MessagesScreen.tsx / ChatScreen.tsx
+│   ├── SearchScreen.tsx / MapScreen.tsx
+│   ├── LoginScreen.tsx / SignupScreen.tsx / ForgotPasswordScreen.tsx / ChangePasswordScreen.tsx
+│   ├── SettingsScreen.tsx / EditProfileScreen.tsx / ActivityScreen.tsx / SavedScreen.tsx
+│   ├── PostDetailScreen.tsx / PostDetailModal.tsx / CommentsSheet.tsx / StoryViewer.tsx
+│   ├── AboutScreen.tsx / LegalScreen.tsx / WelcomeScreen.tsx
+│   └── ...
+├── services/
+│   └── ImageService.ts          # Sélection et compression d'images
+├── i18n.ts                      # Traductions FR/EN (namespaces: profile, settings, post, garage)
+├── supabaseClient.js             # Initialisation du client Supabase
+├── App.js                        # Point d'entrée : SafeAreaProvider + AppProvider + AppNavigator
+└── app.json                      # Config Expo (splash, icône, orientations)
+```
 
 ---
 
@@ -68,190 +61,99 @@ navigation/
 
 ```
 App
+├─ SafeAreaProvider
 ├─ AppProvider (Context)
-└─ AppNavigator
-   ├─ MainNavigator (Bottom Tabs)
-   │  ├─ HomeStackNavigator
-   │  │  └─ HomeScreen
-   │  ├─ MapStackNavigator
-   │  │  └─ MapScreen
-   │  ├─ SearchStackNavigator
-   │  │  └─ SearchScreen
-   │  ├─ MessagesStackNavigator
-   │  │  └─ MessagesScreen
-   │  └─ ProfileStackNavigator
-   │     ├─ ProfileScreen
-   │     ├─ EditProfileScreen
-   │     ├─ AddVehicleScreen
-   │     ├─ SettingsScreen
-   │     ├─ ActivityScreen
-   │     ├─ SavedScreen
-   │     └─ CreateStoryScreen (Modal)
-   └─ Modals
-      ├─ PostDetailModal
-      ├─ StoryViewer
-      └─ ActionSheets
+└─ AppNavigator (thème dark)
+   ├─ Auth Stack (Login, Signup, ForgotPassword)
+   └─ MainNavigator (Bottom Tabs, 5 onglets)
+      ├─ HomeStackNavigator
+      │  └─ HomeScreen → PostDetailScreen, CommentsSheet
+      ├─ SearchStackNavigator
+      │  └─ SearchScreen
+      ├─ MapStackNavigator
+      │  └─ MapScreen
+      ├─ MessagesStackNavigator
+      │  └─ MessagesScreen → ChatScreen, CreateGroupScreen
+      └─ ProfileStackNavigator
+         ├─ ProfileScreen → EditProfileScreen, SettingsScreen, ActivityScreen, SavedScreen
+         ├─ GarageScreen → AddVehicleScreen → VehiclePlateSearchScreen
+         │                                  → CertificationScreen
+         └─ CreateStoryScreen (Modal)
 ```
 
 ---
 
-## Key Services
+## Model Layer (Context + Services)
 
-### ImageService
+### AppContext (`context/AppContext.tsx`)
+État global partagé entre écrans, pour éviter les rechargements et resynchroniser feed ↔ profil sans prop drilling :
+- **User** : profil connecté (id, username, avatar, followers/following, isPrivate)
+- **Langue active** : FR/EN, persistée, consommée par `i18n.ts`
+- **deletedPostIds** : synchronisation de la suppression d'un post entre le feed et le profil sans refetch complet
+- **Session** : état d'authentification Supabase
+
+### ImageService (`services/ImageService.ts`)
 ```typescript
-// Pick image from gallery
-pickImage(aspect, quality)
-
-// Compress for storage
-compressImage(uri, quality)
-
-// Resize thumbnails
-resizeImage(uri, width, height)
-
-// Upload to backend
-uploadImage(uri, bucket)
-
-// Cache cleanup
-cleanupCachedImages()
+pickImage(aspect, quality)      // Sélection depuis la galerie
+compressImage(uri, quality)     // Compression avant upload
+uploadImage(uri, bucket)        // Upload vers Supabase Storage
 ```
 
----
-
-## Global State (AppContext)
-
-### User Profile
-- id, username, displayName, avatar, bio
-- followersCount, followingCount, postsCount
-- isPrivate flag
-
-### Posts (Garage)
-- id, title, image, description
-- likes, comments, shares
-- isSaved flag
-
-### Highlights (Stories)
-- id, name, image
-- createdAt, storyCount
-
-### Notifications
-- unreadCount
-- markAsRead()
+### useMessages (`hooks/useMessages.ts`)
+Fetch des conversations, envoi de message, double-tap like, soft delete, statut de lecture (double coche).
 
 ---
 
-## Next Features to Implement
+## Controller Layer (Navigation)
 
-### High Priority
-- [ ] Feed page (HomeScreen with FlatList)
-- [ ] Real Supabase integration (auth + storage)
-- [ ] Pull-to-refresh
-- [ ] Infinite pagination
-- [ ] Comment system
-- [ ] Direct messaging
-
-### Medium Priority
-- [ ] Search functionality
-- [ ] User discovery/explore
-- [ ] Notifications real-time
-- [ ] Share to social
-- [ ] Profile customization
-
-### Low Priority
-- [ ] Dark mode
-- [ ] Multiple languages
-- [ ] Accessibility (a11y)
-- [ ] Analytics integration
-- [ ] Push notifications
+Chaque stack est son propre fichier. Les `screenOptions` (interpolateurs de transition, `cardStyle`, `gestureEnabled`) sont configurés au niveau du navigateur, pas dans les composants d'écran :
+- `CardStyleInterpolators.forHorizontalIOS` pour les navigations classiques
+- `ModalSlideFromBottomIOS` pour les écrans de création (CreatePost, CreateStory, AddVehicle, CreateGroup)
 
 ---
 
-## API Integration Points
+## Backend (Supabase)
 
-### Supabase Ready
-```typescript
-// Already configured
-import { supabase } from '../supabaseClient'
-
-// To implement:
-supabase.storage.uploadImage()
-supabase.database.posts.insert()
-supabase.database.highlights.insert()
-supabase.realtime.subscribe()
-```
+- **PostgreSQL relationnel** : JOINs en une requête (`posts.select('*, profiles!user_id(...)')`) pour éviter le N+1.
+- **Row-Level Security** : politiques définies en SQL au niveau des tables, pas de couche d'autorisation applicative séparée.
+- **Storage** : buckets `avatars`, `posts`, `garage`, `stories` (RLS), plus un bucket privé `preuves_propriete` pour les preuves de certification (URL signée, validité 10 ans).
+- **Edge Functions** : `fetch-vehicle-info` — appelle l'API SIV d'immatriculation côté serveur pour ne pas exposer la clé API tierce dans le client mobile, et centralise la normalisation de la plaque. Tourne en mode démo (données fictives) tant qu'aucune clé d'API SIV payante n'est configurée.
+- **Tables notables** : `garage_vehicles` (avec `plaque_hash` et `vin_hash`, deux colonnes uniques en SHA-256 empêchant qu'un même véhicule soit ajouté par deux comptes), `demandes_certification` (statut `en_attente` → validation manuelle côté équipe).
 
 ---
 
-## Testing Checklist
+## Décisions d'architecture notables
 
-- [x] Image picking works (AddVehicle, EditProfile, CreateStory)
-- [x] Image compression works
-- [x] Post engagement (like, save, share)
-- [x] Story creation and viewing
-- [x] Navigation flows
-- [x] Global state updates
-- [ ] API integration
-- [ ] Offline support
-- [ ] Error handling edge cases
+- **Feed "dual-source"** : `HomeScreen` agrège les posts officiels Vroom et les posts de l'utilisateur connecté via deux requêtes parallèles, déduplique par ID, trie par date — permet un feed non vide dès la première connexion.
+- **`useFocusEffect` + pull-to-refresh** sur le feed : relance le fetch à chaque retour sur l'écran, sans WebSocket ni polling.
+- **Certification par photo-preuve** : upload dans un bucket privé, création d'une demande en base dissociée de la validation manuelle.
+- **Recherche par plaque** : formatage SIV en temps réel (`AB-123-CD`), skeleton loader pendant l'appel Edge Function, résultat pré-remplissant le formulaire `AddVehicle` ou saisie manuelle en fallback.
+- **Vérification VIN à l'ajout** : champ VIN optionnel dans `AddVehicleScreen`, décodé via l'API publique gratuite NHTSA vPIC (marque/modèle/année) pour signaler une incohérence avant enregistrement. Le VIN est haché (SHA-256) et stocké dans `vin_hash`, avec la même contrainte d'unicité que `plaque_hash` — un véhicule déjà enregistré (par plaque ou VIN) ne peut pas être ajouté par un second compte.
 
 ---
 
-## Performance Metrics Target
+## Design system
 
-- Load time: < 2s
-- Image load: < 1s (cached)
-- Scroll FPS: 60fps
-- Memory: < 150MB
-- Cache size: < 500MB
+Thème dark global (Coffee Bean `#140102`, Racing Red `#E50914`), typographie Poppins (Google Fonts), gradients et blur natifs (`expo-blur`), safe areas (notch/Dynamic Island).
 
 ---
 
-## Development Standards
+## État des lieux / prochaines briques
 
-### Code Style
-- TypeScript for screens
-- JSDoc comments for services
-- Consistent naming (camelCase)
-- Props validation with types
+### En cours de cadrage
+- [ ] Carte interactive (`MapScreen`, actuellement un stub) : géolocalisation, points d'intérêt (événements, rassemblements), export d'un lieu vers une app GPS externe
 
-### File Organization
-```
-screens/     - UI components
-services/    - Business logic
-context/     - Global state
-navigation/  - Navigation config
-assets/      - Images, fonts
-```
-
-### Commit Messages
-- feat: new feature
-- fix: bug fix
-- refactor: code improvements
-- docs: documentation
-- test: test additions
+### Non commencé
+- [ ] Tests automatisés (unitaires/intégration) — actuellement absents du projet
+- [ ] Notifications push
+- [ ] Pagination infinie sur le feed (actuellement chargement complet dual-source)
+- [ ] Accessibilité (a11y)
 
 ---
 
-## Debugging
+## Standards de code
 
-### Common Issues
-1. **Image not loading**: Check URI format, use fallback
-2. **State not updating**: Check context provider wrapping
-3. **Memory leak**: Clean up subscriptions, abort requests
-4. **Slow scrolling**: Optimize with FlatList, remove console logs
-
-### Tools
-- Flipper: React Native debugging
-- Expo DevTools: Network & storage inspection
-- React DevTools: Component inspection
-
----
-
-## Deployment Checklist
-
-- [ ] Remove console.log statements
-- [ ] Update API endpoints
-- [ ] Configure environment variables
-- [ ] Test on real devices
-- [ ] Check app.json settings
-- [ ] Build APK/IPA
-- [ ] Submit to stores
+- TypeScript pour les écrans et services (migration progressive, quelques fichiers `.js` legacy en navigation)
+- Un écran = un fichier dans `screens/`
+- Un stack de navigation = un fichier dans `navigation/`
+- Commits : `feat:`, `fix:`, `refactor:`, `docs:`

@@ -232,6 +232,12 @@ export default function AddVehicleScreen() {
   // Plaque (optionnelle, stockée sous forme hachée)
   const [plateRaw, setPlateRaw] = useState(prefill?.plateNormalized ?? '');
 
+  // VIN (optionnel, stocké sous forme hachée) — vérifié via NHTSA vPIC (gratuit)
+  const [vin, setVin] = useState('');
+  const [vinChecking, setVinChecking] = useState(false);
+  const [vinCheckResult, setVinCheckResult] = useState<{ make: string; model: string; year: string } | null>(null);
+  const [vinCheckError, setVinCheckError] = useState<string | null>(null);
+
   // Pré-remplissage si on revient en arrière et qu'on ouvre de nouveau
   useEffect(() => {
     if (prefill?.brand)           setBrand(prefill.brand);
@@ -258,6 +264,50 @@ export default function AddVehicleScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const isValid = imageUri.trim() !== '' && brand.trim() !== '' && model.trim() !== '' && year.trim().length === 4;
+
+  // ── Vérification VIN via NHTSA vPIC (gratuit, sans clé) ────────────────
+  const handleCheckVin = useCallback(async () => {
+    const cleanVin = vin.trim().toUpperCase();
+    if (cleanVin.length !== 17) {
+      setVinCheckError('Le VIN doit contenir exactement 17 caractères.');
+      return;
+    }
+
+    setVinChecking(true);
+    setVinCheckError(null);
+    setVinCheckResult(null);
+
+    try {
+      const res = await fetch(
+        `https://vpic.nhtsa.dot.gov/api/vehicles/decodevinvalues/${encodeURIComponent(cleanVin)}?format=json`,
+        { signal: AbortSignal.timeout(8000) }
+      );
+      const json = await res.json();
+      const decoded = json?.Results?.[0];
+
+      if (!decoded || (!decoded.Make && !decoded.Model)) {
+        setVinCheckError('VIN introuvable ou non reconnu. Vérifie la saisie.');
+        return;
+      }
+
+      const decodedMake = String(decoded.Make ?? '').trim();
+      const decodedModel = String(decoded.Model ?? '').trim();
+      const decodedYear = String(decoded.ModelYear ?? '').trim();
+
+      setVinCheckResult({ make: decodedMake, model: decodedModel, year: decodedYear });
+
+      const brandMatches = brand.trim() === '' || decodedMake.toLowerCase().includes(brand.trim().toLowerCase()) || brand.trim().toLowerCase().includes(decodedMake.toLowerCase());
+      const yearMatches = year.trim() === '' || year.trim() === decodedYear;
+
+      if (decodedMake && (!brandMatches || (decodedYear && !yearMatches))) {
+        setVinCheckError(`Attention : ce VIN correspond à ${decodedMake} ${decodedModel} (${decodedYear || '—'}), ce qui ne correspond pas totalement à ce que tu as saisi.`);
+      }
+    } catch {
+      setVinCheckError('Impossible de contacter le service de vérification. Réessaie plus tard.');
+    } finally {
+      setVinChecking(false);
+    }
+  }, [vin, brand, year]);
 
   const pickImage = useCallback(async () => {
     const { status: perm } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -293,23 +343,27 @@ export default function AddVehicleScreen() {
     setIsSubmitting(true);
 
     try {
-      let publicUrl = imageUri;
-
-      if (imageBase64) {
-        const binaryStr = atob(imageBase64);
-        const bytes = new Uint8Array(binaryStr.length);
-        for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);
-
-        const filePath = `${user.id}/${Date.now()}.jpg`;
-        const { error: uploadError } = await supabase.storage
-          .from('garage')
-          .upload(filePath, bytes, { contentType: 'image/jpeg' });
-
-        if (uploadError) throw uploadError;
-
-        const { data: urlData } = supabase.storage.from('garage').getPublicUrl(filePath);
-        publicUrl = urlData.publicUrl;
+      // Sans base64 on ne peut pas uploader — un chemin local (file://, ph://) ne
+      // résoudrait jamais chez les autres utilisateurs ni après réinstallation.
+      if (!imageBase64) {
+        Alert.alert(t.errorMsg, 'La photo n\'a pas pu être lue. Réessaie de la sélectionner.');
+        setIsSubmitting(false);
+        return;
       }
+
+      const binaryStr = atob(imageBase64);
+      const bytes = new Uint8Array(binaryStr.length);
+      for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);
+
+      const filePath = `${user.id}/${Date.now()}.jpg`;
+      const { error: uploadError } = await supabase.storage
+        .from('garage')
+        .upload(filePath, bytes, { contentType: 'image/jpeg' });
+
+      if (uploadError) throw uploadError;
+
+      const { data: urlData } = supabase.storage.from('garage').getPublicUrl(filePath);
+      const publicUrl = urlData.publicUrl;
 
       // Hacher la plaque (SHA-256) — jamais en clair en base
       let plateHash: string | null = null;
@@ -317,6 +371,15 @@ export default function AddVehicleScreen() {
         plateHash = await Crypto.digestStringAsync(
           Crypto.CryptoDigestAlgorithm.SHA256,
           plateRaw.trim().toUpperCase()
+        );
+      }
+
+      // Hacher le VIN (SHA-256) — même principe que la plaque, jamais en clair en base
+      let vinHash: string | null = null;
+      if (vin.trim()) {
+        vinHash = await Crypto.digestStringAsync(
+          Crypto.CryptoDigestAlgorithm.SHA256,
+          vin.trim().toUpperCase()
         );
       }
 
@@ -338,22 +401,15 @@ export default function AddVehicleScreen() {
         status: status ?? null,
         notes: notes.trim() || null,
         plaque_hash: plateHash,
+        vin_hash: vinHash,
       });
 
       if (insertError) {
-        // Code 23505 = violation contrainte UNIQUE (plaque déjà enregistrée)
-        if (insertError.code === '23505' && insertError.message.includes('plaque_hash')) {
+        // Code 23505 = violation contrainte UNIQUE (plaque ou VIN déjà enregistré par un autre compte)
+        if (insertError.code === '23505' && (insertError.message.includes('plaque_hash') || insertError.message.includes('vin_hash'))) {
           Alert.alert(
             'Véhicule déjà enregistré',
-            'Cette plaque est déjà associée à un autre profil Vroom.\n\nSouhaitez-vous revendiquer la propriété ?',
-            [
-              { text: 'Annuler', style: 'cancel' },
-              {
-                text: 'Revendiquer',
-                // La plaque appartient à quelqu'un d'autre → flow certification
-                onPress: () => navigation.navigate('VehiclePlateSearch'),
-              },
-            ]
+            'Ce véhicule (plaque ou numéro de châssis) est déjà associé à un autre compte Vroom.\n\nSi tu penses qu\'il s\'agit d\'une erreur ou que tu es le nouveau propriétaire, contacte le support Vroom.',
           );
           return;
         }
@@ -367,7 +423,7 @@ export default function AddVehicleScreen() {
     } finally {
       setIsSubmitting(false);
     }
-  }, [isValid, isSubmitting, user?.id, imageUri, imageBase64, brand, model, year, nickname, power, acceleration, transmission, drivetrain, fuel, color, mileage, acquiredAt, status, notes, navigation]);
+  }, [isValid, isSubmitting, user?.id, imageUri, imageBase64, brand, model, year, nickname, power, acceleration, transmission, drivetrain, fuel, color, mileage, acquiredAt, status, notes, plateRaw, vin, navigation]);
 
   return (
     <KeyboardAvoidingView
@@ -425,14 +481,80 @@ export default function AddVehicleScreen() {
 
         <Field label={t.nickname} value={nickname} onChangeText={setNickname} placeholder="La rouge, Ma daily…" />
 
+        {/* ── VIN (optionnel) ── */}
+        <View style={styles.fieldWrapper}>
+          <Text style={styles.fieldLabel}>VIN / NUMÉRO DE CHÂSSIS (optionnel)</Text>
+          <View style={styles.vinRow}>
+            <TextInput
+              style={[styles.fieldInput, { flex: 1, fontFamily: MONO }]}
+              value={vin}
+              onChangeText={(v) => {
+                setVin(v.replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 17));
+                setVinCheckResult(null);
+                setVinCheckError(null);
+              }}
+              placeholder="17 caractères"
+              placeholderTextColor={C.placeholder}
+              autoCapitalize="characters"
+              autoCorrect={false}
+              maxLength={17}
+            />
+            <Pressable
+              style={[styles.vinCheckBtn, (vin.trim().length !== 17 || vinChecking) && styles.submitBtnDisabled]}
+              onPress={handleCheckVin}
+              disabled={vin.trim().length !== 17 || vinChecking}
+            >
+              {vinChecking ? (
+                <ActivityIndicator size="small" color={C.white} />
+              ) : (
+                <Text style={styles.vinCheckBtnText}>Vérifier</Text>
+              )}
+            </Pressable>
+          </View>
+          <Text style={styles.cardHint}>
+            Vérification gratuite via la base publique NHTSA — confirme que la marque/modèle/année correspondent.
+          </Text>
+          {vinCheckResult && !vinCheckError && (
+            <Text style={[styles.cardHint, { color: '#34C759' }]}>
+              ✓ Correspond à {vinCheckResult.make} {vinCheckResult.model} ({vinCheckResult.year || '—'})
+            </Text>
+          )}
+          {vinCheckError && (
+            <Text style={[styles.cardHint, { color: C.accent }]}>{vinCheckError}</Text>
+          )}
+        </View>
+
         {/* ── Performance (optionnel) ── */}
         <SectionTitle label="PERFORMANCE (optionnel)" />
 
         <View style={styles.row}>
           <View style={{ flex: 1 }}>
+            <Field label="PUISSANCE" value={power} onChangeText={setPower} placeholder="510 ch" mono />
+          </View>
+          <View style={{ flex: 1 }}>
             <Field label="0 — 100 (s)" value={acceleration} onChangeText={setAcceleration} placeholder="3.2s" mono />
           </View>
         </View>
+
+        <ChipSelector label="TRANSMISSION" options={TRANSMISSION_OPTIONS} value={transmission} onChange={setTransmission} />
+        <ChipSelector label="TRANSMISSION AUX ROUES" options={DRIVETRAIN_OPTIONS} value={drivetrain} onChange={setDrivetrain} />
+        <ChipSelector label="CARBURANT" options={FUEL_OPTIONS} value={fuel} onChange={setFuel} />
+
+        {/* ── Détails (optionnel) ── */}
+        <SectionTitle label="DÉTAILS (optionnel)" />
+
+        <View style={styles.row}>
+          <View style={{ flex: 1 }}>
+            <Field label="COULEUR" value={color} onChangeText={setColor} placeholder="Rouge Guards" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Field label="KILOMÉTRAGE" value={mileage} onChangeText={setMileage} placeholder="45000" keyboardType="numeric" />
+          </View>
+        </View>
+
+        <Field label="ACQUIS EN" value={acquiredAt} onChangeText={setAcquiredAt} placeholder="2023" />
+
+        <ChipSelector label="USAGE" options={STATUS_OPTIONS} value={status} onChange={setStatus} />
 
         {/* ── Notes ── */}
         <SectionTitle label={t.notes} />
@@ -636,6 +758,28 @@ const styles = StyleSheet.create({
   },
   chipTextActive: { color: C.accent },
 
+  vinRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  vinCheckBtn: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    backgroundColor: C.accent,
+  },
+  vinCheckBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: C.white,
+  },
+  cardHint: {
+    fontSize: 11,
+    color: C.whiteFaint,
+    marginTop: 6,
+    lineHeight: 15,
+  },
   charCount: {
     fontFamily: MONO,
     fontSize: 12,

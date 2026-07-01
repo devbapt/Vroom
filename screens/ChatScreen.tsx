@@ -21,6 +21,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
 import { useAppContext } from '../context/AppContext';
 import { useMessages, type Message, type ChatUser } from '../hooks/useMessages';
+import { supabase } from '../supabaseClient';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -140,13 +141,23 @@ function MessageBubble({ msg, isMe, otherUser, showAvatar, onDoubleTap, onLongPr
             msg.is_deleted && styles.bubbleDeleted,
           ]}
         >
-          <Text style={[
-            styles.bubbleText,
-            isMe ? styles.bubbleTextMe : styles.bubbleTextThem,
-            msg.is_deleted && styles.bubbleTextDeleted,
-          ]}>
-            {msg.is_deleted ? 'Message supprimé' : msg.content}
-          </Text>
+          {!msg.is_deleted && msg.image_url && (
+            <ExpoImage
+              source={msg.image_url}
+              style={styles.bubbleImage}
+              contentFit="cover"
+              cachePolicy="memory-disk"
+            />
+          )}
+          {(msg.is_deleted || msg.content) && (
+            <Text style={[
+              styles.bubbleText,
+              isMe ? styles.bubbleTextMe : styles.bubbleTextThem,
+              msg.is_deleted && styles.bubbleTextDeleted,
+            ]}>
+              {msg.is_deleted ? 'Message supprimé' : msg.content}
+            </Text>
+          )}
           {msg.is_liked && !msg.is_deleted && (
             <View style={[styles.likeTag, isMe ? styles.likeTagMe : styles.likeTagThem]}>
               <Text style={{ fontSize: 11 }}>❤️</Text>
@@ -221,6 +232,7 @@ export default function ChatScreen() {
   const [draft, setDraft]         = useState('');
   const [sending, setSending]     = useState(false);
   const [menuOpen, setMenuOpen]   = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
   const inputRef  = useRef<TextInput>(null);
   const rotateAnim = useRef(new Animated.Value(0)).current;
@@ -247,29 +259,67 @@ export default function ChatScreen() {
   const handleAction = useCallback(async (id: ActionId) => {
     closeMenu();
     if (id === 'photo' || id === 'camera') {
+      if (uploadingPhoto) return;
+      const requestPerm = id === 'camera'
+        ? ImagePicker.requestCameraPermissionsAsync
+        : ImagePicker.requestMediaLibraryPermissionsAsync;
+      const { status } = await requestPerm();
+      if (status !== 'granted') {
+        Alert.alert('Permission refusée', 'Vroom a besoin de cet accès pour partager une photo.');
+        return;
+      }
+
       const launch = id === 'camera'
         ? ImagePicker.launchCameraAsync
         : ImagePicker.launchImageLibraryAsync;
-      const result = await launch({ mediaTypes: ['images'], quality: 0.8 });
-      if (!result.canceled && result.assets[0]) {
-        await sendMessage(`📷 [Photo partagée]`);
+      const result = await launch({ mediaTypes: ['images'], quality: 0.8, base64: true });
+      if (result.canceled || !result.assets[0]) return;
+
+      const asset = result.assets[0];
+      let b64 = asset.base64 ?? null;
+      if (b64?.includes(';base64,')) b64 = b64.split(';base64,')[1] ?? b64;
+      if (!b64 || !user?.id) {
+        Alert.alert('Erreur', 'Impossible de lire cette photo. Réessaie.');
+        return;
+      }
+
+      setUploadingPhoto(true);
+      try {
+        const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+        const filePath = `${user.id}/${Date.now()}.jpg`;
+        const { error: uploadErr } = await supabase.storage
+          .from('messages')
+          .upload(filePath, bytes, { contentType: 'image/jpeg' });
+        if (uploadErr) throw uploadErr;
+
+        const { data: urlData } = supabase.storage.from('messages').getPublicUrl(filePath);
+        const ok = await sendMessage('', urlData.publicUrl);
+        if (!ok) throw new Error('Envoi impossible');
+      } catch (err: any) {
+        Alert.alert('Erreur', err?.message ?? "La photo n'a pas pu être envoyée.");
+      } finally {
+        setUploadingPhoto(false);
       }
     } else if (id === 'location') {
       await sendMessage('📍 Position partagée');
     } else if (id === 'map') {
       await sendMessage('🗺️ Carte partagée');
     }
-  }, [closeMenu, sendMessage]);
+  }, [closeMenu, sendMessage, uploadingPhoto, user?.id]);
 
   // ── Send ──────────────────────────────────────────────────────────────────
   const handleSend = useCallback(async () => {
     const text = draft.trim();
     if (!text || sending) return;
     setSending(true);
-    setDraft('');
     closeMenu();
-    await sendMessage(text);
+    const ok = await sendMessage(text);
     setSending(false);
+    if (ok) {
+      setDraft('');
+    } else {
+      Alert.alert('Message non envoyé', 'Vérifie ta connexion et réessaie.');
+    }
   }, [draft, sending, sendMessage, closeMenu]);
 
   // ── Double-tap like ───────────────────────────────────────────────────────
@@ -483,6 +533,7 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   bubbleDeleted: { opacity: 0.45 },
+  bubbleImage: { width: 200, height: 200, borderRadius: 14, marginBottom: 4, backgroundColor: '#000' },
   bubbleText:        { fontSize: 15, lineHeight: 21 },
   bubbleTextMe:      { color: '#FFF' },
   bubbleTextThem:    { color: C.whiteSoft },

@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { useRoute } from '@react-navigation/native';
 import { supabase } from '../supabaseClient';
 
 import IconVroom from '../assets/icon_vroom_Couleur.svg';
@@ -30,6 +31,8 @@ type FieldKey = 'current' | 'next' | 'confirm';
 
 export default function ChangePasswordScreen({ navigation }: { navigation: any }) {
   const insets = useSafeAreaInsets();
+  const route = useRoute<any>();
+  const isRecoveryMode: boolean = route.params?.isRecoveryMode === true;
 
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword]         = useState('');
@@ -48,7 +51,11 @@ export default function ChangePasswordScreen({ navigation }: { navigation: any }
     setError('');
     setSuccess('');
 
-    if (!currentPassword || !newPassword || !confirmPassword) {
+    if (!isRecoveryMode && !currentPassword) {
+      setError('Veuillez remplir tous les champs.');
+      return;
+    }
+    if (!newPassword || !confirmPassword) {
       setError('Veuillez remplir tous les champs.');
       return;
     }
@@ -60,44 +67,59 @@ export default function ChangePasswordScreen({ navigation }: { navigation: any }
       setError('Le nouveau mot de passe doit contenir au moins 6 caractères.');
       return;
     }
-    if (currentPassword === newPassword) {
+    if (!isRecoveryMode && currentPassword === newPassword) {
       setError('Le nouveau mot de passe doit être différent de l\'actuel.');
       return;
     }
 
     setLoading(true);
 
-    // Vérifier le mot de passe actuel
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user?.email) {
-      setError('Impossible de vérifier votre identité. Reconnectez-vous.');
-      setLoading(false);
-      return;
-    }
+    // Hors recovery : vérifier le mot de passe actuel avant de le changer.
+    // En recovery (lien email cliqué), la session est déjà authentifiée par
+    // Supabase — l'utilisateur ne connaît justement plus son mot de passe.
+    if (!isRecoveryMode) {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user?.email) {
+        setError('Impossible de vérifier votre identité. Reconnectez-vous.');
+        setLoading(false);
+        return;
+      }
 
-    const { error: verifyError } = await supabase.auth.signInWithPassword({
-      email: user.email,
-      password: currentPassword,
-    });
+      const { error: verifyError } = await supabase.auth.signInWithPassword({
+        email: user.email,
+        password: currentPassword,
+      });
 
-    if (verifyError) {
-      setError('Mot de passe actuel incorrect.');
-      setLoading(false);
-      return;
+      if (verifyError) {
+        setError('Mot de passe actuel incorrect.');
+        setLoading(false);
+        return;
+      }
     }
 
     // Mettre à jour avec le nouveau mot de passe
     const { error: updateError } = await supabase.auth.updateUser({ password: newPassword });
-    setLoading(false);
 
     if (updateError) {
+      setLoading(false);
       setError(updateError.message);
-    } else {
-      setSuccess('Mot de passe mis à jour avec succès.');
-      setCurrentPassword('');
-      setNewPassword('');
-      setConfirmPassword('');
+      return;
     }
+
+    if (isRecoveryMode) {
+      // Le nouveau mot de passe est actif. On déconnecte pour repartir sur un
+      // écran de connexion propre — évite de rester coincé sur cet écran de
+      // recovery (isRecovery ne repasse à false que sur SIGNED_OUT/SIGNED_IN).
+      await supabase.auth.signOut();
+      setLoading(false);
+      return;
+    }
+
+    setLoading(false);
+    setSuccess('Mot de passe mis à jour avec succès.');
+    setCurrentPassword('');
+    setNewPassword('');
+    setConfirmPassword('');
   };
 
   return (
@@ -120,38 +142,48 @@ export default function ChangePasswordScreen({ navigation }: { navigation: any }
 
           {/* Title */}
           <View style={styles.titleBlock}>
-            <Text style={styles.title}>Changer de mot de passe</Text>
-            <Text style={styles.subtitle}>Confirmez d'abord votre mot de passe actuel</Text>
+            <Text style={styles.title}>
+              {isRecoveryMode ? 'Choisir un nouveau mot de passe' : 'Changer de mot de passe'}
+            </Text>
+            <Text style={styles.subtitle}>
+              {isRecoveryMode
+                ? 'Ton lien de récupération est validé — choisis un nouveau mot de passe.'
+                : "Confirmez d'abord votre mot de passe actuel"}
+            </Text>
           </View>
 
-          {/* Current password */}
-          <View style={[styles.inputWrapper, focused.current && styles.inputFocused]}>
-            <Ionicons
-              name="lock-closed-outline"
-              size={20}
-              color={focused.current ? COLORS.accent : COLORS.textMuted}
-              style={styles.icon}
-            />
-            <TextInput
-              style={[styles.input, Platform.OS === 'web' && { outlineStyle: 'none' } as any]}
-              placeholder="Mot de passe actuel"
-              placeholderTextColor={COLORS.textMuted}
-              secureTextEntry={!show.current}
-              value={currentPassword}
-              onChangeText={t => { setCurrentPassword(t); if (error) setError(''); }}
-              onFocus={() => onFocus('current')}
-              onBlur={() => onBlur('current')}
-            />
-            <Pressable onPress={() => toggleShow('current')} hitSlop={8} style={styles.eyeBtn}>
-              <Ionicons
-                name={show.current ? 'eye-off-outline' : 'eye-outline'}
-                size={20}
-                color={focused.current ? COLORS.accent : COLORS.textMuted}
-              />
-            </Pressable>
-          </View>
+          {/* Current password — masqué en mode recovery : c'est justement ce que l'utilisateur a oublié */}
+          {!isRecoveryMode && (
+            <>
+              <View style={[styles.inputWrapper, focused.current && styles.inputFocused]}>
+                <Ionicons
+                  name="lock-closed-outline"
+                  size={20}
+                  color={focused.current ? COLORS.accent : COLORS.textMuted}
+                  style={styles.icon}
+                />
+                <TextInput
+                  style={[styles.input, Platform.OS === 'web' && { outlineStyle: 'none' } as any]}
+                  placeholder="Mot de passe actuel"
+                  placeholderTextColor={COLORS.textMuted}
+                  secureTextEntry={!show.current}
+                  value={currentPassword}
+                  onChangeText={t => { setCurrentPassword(t); if (error) setError(''); }}
+                  onFocus={() => onFocus('current')}
+                  onBlur={() => onBlur('current')}
+                />
+                <Pressable onPress={() => toggleShow('current')} hitSlop={8} style={styles.eyeBtn}>
+                  <Ionicons
+                    name={show.current ? 'eye-off-outline' : 'eye-outline'}
+                    size={20}
+                    color={focused.current ? COLORS.accent : COLORS.textMuted}
+                  />
+                </Pressable>
+              </View>
 
-          <View style={styles.divider} />
+              <View style={styles.divider} />
+            </>
+          )}
 
           {/* New password */}
           <View style={[styles.inputWrapper, focused.next && styles.inputFocused]}>
@@ -222,13 +254,15 @@ export default function ChangePasswordScreen({ navigation }: { navigation: any }
             }
           </Pressable>
 
-          {/* Cancel */}
-          <Pressable
-            onPress={() => navigation.goBack()}
-            style={({ pressed }: any) => [styles.cancelBtn, pressed && { opacity: 0.6 }]}
-          >
-            <Text style={styles.cancelText}>Annuler</Text>
-          </Pressable>
+          {/* Cancel — masqué en recovery : aucun écran précédent vers lequel revenir */}
+          {!isRecoveryMode && (
+            <Pressable
+              onPress={() => navigation.goBack()}
+              style={({ pressed }: any) => [styles.cancelBtn, pressed && { opacity: 0.6 }]}
+            >
+              <Text style={styles.cancelText}>Annuler</Text>
+            </Pressable>
+          )}
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>

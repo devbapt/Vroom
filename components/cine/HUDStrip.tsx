@@ -27,6 +27,8 @@ interface HUDColumn {
 }
 
 function getColumns(type: CineDrivePostType, hud: AnyHUD): HUDColumn[] {
+  if (!hud) return [];
+
   switch (type) {
     case 'track': {
       const d = hud as TrackHUD;
@@ -71,13 +73,16 @@ function getColumns(type: CineDrivePostType, hud: AnyHUD): HUDColumn[] {
     }
     case 'spotted': {
       const d = hud as SpottedHUD;
-      const stars = '★'.repeat(d.rarity) + '☆'.repeat(5 - d.rarity);
+      const rarity = Math.min(5, Math.max(0, Number(d.rarity) || 0));
+      const stars = '★'.repeat(rarity) + '☆'.repeat(5 - rarity);
       return [
         { label: 'CITY',   value: d.city },
         { label: 'MODEL',  value: d.model },
         { label: 'RARITY', value: stars, isAccent: true },
       ];
     }
+    default:
+      return [];
   }
 }
 
