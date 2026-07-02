@@ -152,14 +152,6 @@ export default function UserProfileScreen() {
         setFollowersCount(prev => prev + 1);
         return;
       }
-
-      // Decrement count using DB value to avoid stale closure issues
-      await supabase.rpc('decrement_followers_count', { profile_id: userId }).catch(() => {
-        // Fallback: direct update if RPC doesn't exist
-        supabase.from('profiles')
-          .update({ followers_count: Math.max(0, followersCount - 1) })
-          .eq('id', userId);
-      });
     } else {
       // Optimistic update
       setIsFollowing(true);
@@ -178,23 +170,17 @@ export default function UserProfileScreen() {
         return;
       }
 
-      // Increment count using DB value to avoid stale closure issues
-      await supabase.rpc('increment_followers_count', { profile_id: userId }).catch(() => {
-        // Fallback: direct update if RPC doesn't exist
-        supabase.from('profiles')
-          .update({ followers_count: followersCount + 1 })
-          .eq('id', userId);
-      });
+      await supabase.from('notifications').insert({ user_id: userId, actor_id: user.id, type: 'follow' });
     }
 
-    // Re-fetch the real count from DB to ensure UI matches persisted state
+    // Re-fetch the real count from DB (maintenu par trigger sur `followers`) pour éviter toute dérive
     const { data: refreshed } = await supabase
       .from('profiles')
       .select('followers_count')
       .eq('id', userId)
       .single();
     if (refreshed) setFollowersCount(refreshed.followers_count ?? 0);
-  }, [isFollowing, user?.id, userId, followersCount]);
+  }, [isFollowing, user?.id, userId]);
 
   const handleShare = useCallback(async () => {
     try {

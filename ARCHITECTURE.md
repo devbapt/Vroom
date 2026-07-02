@@ -116,9 +116,9 @@ Chaque stack est son propre fichier. Les `screenOptions` (interpolateurs de tran
 
 - **PostgreSQL relationnel** : JOINs en une requête (`posts.select('*, profiles!user_id(...)')`) pour éviter le N+1.
 - **Row-Level Security** : politiques définies en SQL au niveau des tables, pas de couche d'autorisation applicative séparée.
-- **Storage** : buckets `avatars`, `posts`, `garage`, `stories` (RLS), plus un bucket privé `preuves_propriete` pour les preuves de certification (URL signée, validité 10 ans).
+- **Storage** : buckets `avatars`, `posts`, `garage`, `stories`, `map_points` (public, RLS), plus un bucket privé `preuves_propriete` pour les preuves de certification (URL signée, validité 10 ans).
 - **Edge Functions** : `fetch-vehicle-info` — appelle l'API SIV d'immatriculation côté serveur pour ne pas exposer la clé API tierce dans le client mobile, et centralise la normalisation de la plaque. Tourne en mode démo (données fictives) tant qu'aucune clé d'API SIV payante n'est configurée.
-- **Tables notables** : `garage_vehicles` (avec `plaque_hash` et `vin_hash`, deux colonnes uniques en SHA-256 empêchant qu'un même véhicule soit ajouté par deux comptes), `demandes_certification` (statut `en_attente` → validation manuelle côté équipe).
+- **Tables notables** : `garage_vehicles` (avec `plaque_hash` et `vin_hash`, deux colonnes uniques en SHA-256 empêchant qu'un même véhicule soit ajouté par deux comptes), `demandes_certification` (statut `en_attente` → validation manuelle côté équipe), `map_points` (`type` `event`/`route`, RLS : lecture publique, écriture/suppression restreintes à `auth.uid() = user_id`).
 
 ---
 
@@ -139,9 +139,6 @@ Thème dark global (Coffee Bean `#140102`, Racing Red `#E50914`), typographie Po
 ---
 
 ## État des lieux / prochaines briques
-
-### En cours de cadrage
-- [ ] Carte interactive (`MapScreen`, actuellement un stub) : géolocalisation, points d'intérêt (événements, rassemblements), export d'un lieu vers une app GPS externe
 
 ### Non commencé
 - [ ] Tests automatisés (unitaires/intégration) — actuellement absents du projet

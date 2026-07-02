@@ -256,6 +256,17 @@ export default function CommentsSheet({ postId, visible, onClose, onCommentCount
       setComments(prev => [...prev, newComment]);
       onCommentCountChange?.(1);
       // comments_count mis à jour automatiquement par le trigger DB
+
+      const { data: postData } = await supabase.from('posts').select('user_id').eq('id', postId).single();
+      if (postData?.user_id && postData.user_id !== user.id) {
+        await supabase.from('notifications').insert({
+          user_id: postData.user_id,
+          actor_id: user.id,
+          type: 'comment',
+          post_id: postId,
+          comment_id: data.id,
+        });
+      }
     }
     setText('');
     setReplyTo(null);

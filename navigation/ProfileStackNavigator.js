@@ -14,6 +14,7 @@ import LegalScreen         from '../screens/LegalScreen';
 import PostDetailScreen          from '../screens/PostDetailScreen';
 import VehiclePlateSearchScreen  from '../screens/VehiclePlateSearchScreen';
 import CertificationScreen       from '../screens/CertificationScreen';
+import UserProfileScreen         from '../screens/UserProfileScreen';
 
 const Stack = createStackNavigator();
 
@@ -42,6 +43,7 @@ export default function ProfileStackNavigator() {
       <Stack.Screen name="About"           component={AboutScreen} />
       <Stack.Screen name="Legal"           component={LegalScreen} />
       <Stack.Screen name="PostDetail"       component={PostDetailScreen} />
+      <Stack.Screen name="UserProfile"      component={UserProfileScreen} />
       <Stack.Screen name="VehiclePlateSearch" component={VehiclePlateSearchScreen}  options={{ ...TransitionPresets.ModalSlideFromBottomIOS }} />
       <Stack.Screen name="Certification"      component={CertificationScreen}       options={{ ...TransitionPresets.ModalSlideFromBottomIOS }} />
 

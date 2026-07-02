@@ -22,7 +22,6 @@ import { getTranslation } from '../i18n';
 import type {
   CineDrivePostType,
   AnyHUD,
-  CineDrivePost,
 } from '../context/AppContext';
 import type { Translations } from '../i18n';
 
@@ -191,7 +190,7 @@ function RaritySelector({ value, onChange, label }: { value: number; onChange: (
 export default function CreatePostScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
-  const { user, addCinePost, language } = useAppContext();
+  const { user, language } = useAppContext();
   const t = getTranslation(language).post;
   const POST_TYPES = getPostTypes(t);
   const HUD_FIELDS = getHudFields(t);
@@ -286,7 +285,7 @@ export default function CreatePostScreen() {
 
       const hud = buildHUD(postType, hudValues, rarity);
 
-      const { data: inserted, error: insertError } = await supabase
+      const { error: insertError } = await supabase
         .from('posts')
         .insert({
           user_id: user.id,
@@ -298,46 +297,20 @@ export default function CreatePostScreen() {
           description: description.trim() || null,
           image_urls: imageUrls,
           hud_data: hud,
-        })
-        .select()
-        .single();
+        });
 
       if (insertError) {
         Alert.alert(t.errorTitle, t.errorMsg);
         return;
       }
 
-      // Add to local feed immediately
-      const newPost: CineDrivePost = {
-        id: inserted?.id ?? String(timestamp),
-        type: postType,
-        user: { id: user.id, username: user.username ?? '', avatar: user.avatar ?? '' },
-        vehicle: {
-          brand: brand.trim().toUpperCase(),
-          model: model.trim().toUpperCase(),
-          year: year ? parseInt(year, 10) : undefined,
-        },
-        location: location.trim() || undefined,
-        image: imageUrls[0] ?? photos[0]?.uri ?? '',
-        photos: imageUrls.length > 0 ? imageUrls : photos.map(p => p.uri),
-        pages: imageUrls.map((_, i) => ({ id: `pg${i + 1}`, type: 'photo' as const })),
-        hud,
-        description: description.trim() || undefined,
-        likes: 0,
-        isLiked: false,
-        comments: 0,
-        isSaved: false,
-        createdAt: new Date().toISOString(),
-      };
-
-      addCinePost(newPost);
       navigation.goBack();
     } catch (e) {
       Alert.alert(t.errorTitle, t.errorGeneric);
     } finally {
       setIsPublishing(false);
     }
-  }, [photos, brand, model, year, location, description, postType, hudValues, rarity, user, addCinePost, navigation]);
+  }, [photos, brand, model, year, location, description, postType, hudValues, rarity, user, navigation]);
 
   const hudFields = HUD_FIELDS[postType];
 

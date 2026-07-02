@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -28,11 +28,19 @@ const CONTAINER_PADDING = 16;
 type SettingsScreenProps = { navigation: any; };
 
 export default function SettingsScreen({ navigation }: SettingsScreenProps) {
-  const [pushNotifications, setPushNotifications] = useState(true);
-  const [emailNotifications, setEmailNotifications] = useState(false);
-  const [privateAccount, setPrivateAccount] = useState(false);
-  const { language, setLanguage } = useAppContext();
+  const { language, setLanguage, user, updateProfile } = useAppContext();
   const t = getTranslation(language);
+
+  const [pushNotifications, setPushNotifications] = useState(user?.notifPush ?? true);
+  const [emailNotifications, setEmailNotifications] = useState(user?.notifEmail ?? false);
+  const [privateAccount, setPrivateAccount] = useState(user?.isPrivate ?? false);
+
+  useEffect(() => {
+    if (!user) return;
+    setPushNotifications(user.notifPush);
+    setEmailNotifications(user.notifEmail);
+    setPrivateAccount(user.isPrivate);
+  }, [user?.id]);
 
   const handleLogout = async () => {
     const { error } = await supabase.auth.signOut();
@@ -40,6 +48,33 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
   };
 
   const handleLanguageChange = (lang: Language) => setLanguage(lang);
+
+  const persistSetting = async (column: 'is_private' | 'notif_push' | 'notif_email', value: boolean, revert: () => void) => {
+    if (!user?.id) return;
+    const { error } = await supabase.from('profiles').update({ [column]: value }).eq('id', user.id);
+    if (error) {
+      revert();
+      return;
+    }
+    if (column === 'is_private') updateProfile({ isPrivate: value });
+    if (column === 'notif_push') updateProfile({ notifPush: value });
+    if (column === 'notif_email') updateProfile({ notifEmail: value });
+  };
+
+  const handleTogglePrivate = (value: boolean) => {
+    setPrivateAccount(value);
+    persistSetting('is_private', value, () => setPrivateAccount(!value));
+  };
+
+  const handleTogglePush = (value: boolean) => {
+    setPushNotifications(value);
+    persistSetting('notif_push', value, () => setPushNotifications(!value));
+  };
+
+  const handleToggleEmail = (value: boolean) => {
+    setEmailNotifications(value);
+    persistSetting('notif_email', value, () => setEmailNotifications(!value));
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -99,7 +134,7 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
               </View>
               <Switch
                 value={privateAccount}
-                onValueChange={setPrivateAccount}
+                onValueChange={handleTogglePrivate}
                 trackColor={{ false: VROOM_COLORS.fieldBg, true: 'rgba(229, 9, 20, 0.3)' }}
                 thumbColor={privateAccount ? VROOM_COLORS.accent : VROOM_COLORS.muted}
               />
@@ -131,7 +166,7 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
               </View>
               <Switch
                 value={pushNotifications}
-                onValueChange={setPushNotifications}
+                onValueChange={handleTogglePush}
                 trackColor={{ false: VROOM_COLORS.fieldBg, true: 'rgba(229, 9, 20, 0.3)' }}
                 thumbColor={pushNotifications ? VROOM_COLORS.accent : VROOM_COLORS.muted}
               />
@@ -146,7 +181,7 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
               </View>
               <Switch
                 value={emailNotifications}
-                onValueChange={setEmailNotifications}
+                onValueChange={handleToggleEmail}
                 trackColor={{ false: VROOM_COLORS.fieldBg, true: 'rgba(229, 9, 20, 0.3)' }}
                 thumbColor={emailNotifications ? VROOM_COLORS.accent : VROOM_COLORS.muted}
               />

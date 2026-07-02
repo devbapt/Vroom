@@ -64,10 +64,10 @@ function mapRowToSaved(row: any): CineDrivePost {
   };
 }
 
-const SavedItem = memo(function SavedItem({ item, onUnsave }: { item: CineDrivePost; onUnsave: (id: string) => void }) {
+const SavedItem = memo(function SavedItem({ item, onUnsave, onPress }: { item: CineDrivePost; onUnsave: (id: string) => void; onPress: (item: CineDrivePost) => void }) {
   const thumb = item.photos?.[0] ?? item.image;
   return (
-    <Pressable style={({ pressed }) => [styles.item, pressed && { opacity: 0.85 }]}>
+    <Pressable style={({ pressed }) => [styles.item, pressed && { opacity: 0.85 }]} onPress={() => onPress(item)}>
       <ExpoImage
         source={thumb}
         style={styles.itemImage}
@@ -150,8 +150,18 @@ export default function SavedScreen({ navigation }: SavedScreenProps) {
     }
   }, [user?.id]);
 
+  const handleOpenPost = useCallback((item: CineDrivePost) => {
+    navigation.navigate('PostDetail', {
+      id: item.id,
+      name: [item.vehicle.brand, item.vehicle.model].filter(Boolean).join(' ') || item.type,
+      image: item.photos?.[0] ?? item.image,
+      description: item.description,
+      date: item.createdAt ? new Date(item.createdAt).toLocaleDateString('fr-FR') : undefined,
+    });
+  }, [navigation]);
+
   const renderItem = ({ item }: ListRenderItemInfo<CineDrivePost>) => (
-    <SavedItem item={item} onUnsave={handleUnsave} />
+    <SavedItem item={item} onUnsave={handleUnsave} onPress={handleOpenPost} />
   );
 
   return (

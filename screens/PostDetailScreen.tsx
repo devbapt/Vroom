@@ -70,6 +70,7 @@ export default function PostDetailScreen() {
   const [isSaved,       setIsSaved]       = useState(false);
   const [likesCount,    setLikesCount]    = useState(0);
   const [commentsCount, setCommentsCount] = useState(0);
+  const [postOwnerId,   setPostOwnerId]   = useState<string | null>(null);
   const [loading,       setLoading]       = useState(true);
   const [commentsOpen,  setCommentsOpen]  = useState(false);
 
@@ -79,7 +80,7 @@ export default function PostDetailScreen() {
     const load = async () => {
       setLoading(true);
       const [postRes, likedRes, savedRes] = await Promise.all([
-        supabase.from('posts').select('likes_count, comments_count').eq('id', id).single(),
+        supabase.from('posts').select('user_id, likes_count, comments_count').eq('id', id).single(),
         user?.id
           ? supabase.from('post_likes').select('post_id')
               .eq('post_id', id).eq('user_id', user.id).maybeSingle()
@@ -90,6 +91,7 @@ export default function PostDetailScreen() {
           : Promise.resolve({ data: null }),
       ]);
       if (cancelled) return;
+      setPostOwnerId(postRes.data?.user_id ?? null);
       setLikesCount(postRes.data?.likes_count ?? 0);
       setCommentsCount(postRes.data?.comments_count ?? 0);
       setIsLiked(!!likedRes.data);
@@ -107,12 +109,16 @@ export default function PostDetailScreen() {
       setIsLiked(false);
       setLikesCount(p => Math.max(0, p - 1));
       await supabase.from('post_likes').delete().eq('post_id', id).eq('user_id', user.id);
+      await supabase.from('notifications').delete().match({ actor_id: user.id, post_id: id, type: 'like' });
     } else {
       setIsLiked(true);
       setLikesCount(p => p + 1);
       await supabase.from('post_likes').insert({ post_id: id, user_id: user.id });
+      if (postOwnerId && postOwnerId !== user.id) {
+        await supabase.from('notifications').insert({ user_id: postOwnerId, actor_id: user.id, type: 'like', post_id: id });
+      }
     }
-  }, [isLiked, user?.id, id]);
+  }, [isLiked, user?.id, id, postOwnerId]);
 
   const handleSave = useCallback(async () => {
     if (!user?.id) return;

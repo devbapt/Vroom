@@ -1,17 +1,19 @@
-import React from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   Pressable,
-  ScrollView,
   FlatList,
-  Dimensions,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-
-const { width } = Dimensions.get('window');
+import { Image as ExpoImage } from 'expo-image';
+import { supabase } from '../supabaseClient';
+import { useAppContext } from '../context/AppContext';
+import { getTranslation } from '../i18n';
 
 // --- Colors ---
 const VROOM_COLORS = {
@@ -27,85 +29,138 @@ const VROOM_COLORS = {
 
 const CONTAINER_PADDING = 16;
 
-// Mock activity data
-const ACTIVITY_DATA = [
-  {
-    id: '1',
-    type: 'like',
-    user: '@CarEnthusiast',
-    action: 'liked your post',
-    time: '2 hours ago',
-    avatar: 'https://randomuser.me/api/portraits/men/1.jpg',
-  },
-  {
-    id: '2',
-    type: 'follow',
-    user: '@SpeedDemon',
-    action: 'started following you',
-    time: '5 hours ago',
-    avatar: 'https://randomuser.me/api/portraits/women/1.jpg',
-  },
-  {
-    id: '3',
-    type: 'comment',
-    user: '@MotorHead',
-    action: 'commented on your post',
-    time: '1 day ago',
-    avatar: 'https://randomuser.me/api/portraits/men/2.jpg',
-  },
-  {
-    id: '4',
-    type: 'repost',
-    user: '@GearGuru',
-    action: 'reposted your vehicle',
-    time: '2 days ago',
-    avatar: 'https://randomuser.me/api/portraits/women/2.jpg',
-  },
-  {
-    id: '5',
-    type: 'like',
-    user: '@AutoLover',
-    action: 'liked your story',
-    time: '3 days ago',
-    avatar: 'https://randomuser.me/api/portraits/men/3.jpg',
-  },
-];
+type NotificationType = 'like' | 'comment' | 'follow';
+
+interface ActivityItem {
+  id: string;
+  type: NotificationType;
+  createdAt: string;
+  isRead: boolean;
+  actor: { id: string; username: string; avatarUrl: string };
+  post?: { id: string; brand: string; model: string; type: string; imageUrl: string; description: string | null; createdAt: string };
+}
 
 type ActivityScreenProps = {
   navigation: any;
 };
 
+function timeAgo(dateStr: string, t: ReturnType<typeof getTranslation>['activity']) {
+  const diffMs = Date.now() - new Date(dateStr).getTime();
+  const minutes = Math.floor(diffMs / 60000);
+  if (minutes < 1) return t.just_now;
+  if (minutes < 60) return `${minutes}${t.minutes_suffix}`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}${t.hours_suffix}`;
+  const days = Math.floor(hours / 24);
+  return `${days}${t.days_suffix}`;
+}
+
 export default function ActivityScreen({ navigation }: ActivityScreenProps) {
-  const renderActivityItem = ({ item }: { item: typeof ACTIVITY_DATA[0] }) => {
-    const getActivityIcon = () => {
-      switch (item.type) {
-        case 'like':
-          return <Ionicons name="heart" size={20} color={VROOM_COLORS.accent} />;
-        case 'follow':
-          return <Ionicons name="person-add" size={20} color={VROOM_COLORS.accent} />;
-        case 'comment':
-          return <Ionicons name="chatbubble" size={20} color={VROOM_COLORS.accent} />;
-        case 'repost':
-          return <Ionicons name="repeat" size={20} color={VROOM_COLORS.accent} />;
-        default:
-          return null;
+  const { language, user } = useAppContext();
+  const t = getTranslation(language);
+
+  const [items, setItems] = useState<ActivityItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchActivity = useCallback(async () => {
+    if (!user?.id) { setLoading(false); return; }
+    setLoading(true);
+    const { data } = await supabase
+      .from('notifications')
+      .select(`
+        id, type, created_at, is_read,
+        actor:profiles!actor_id(id, username, avatar_url),
+        post:posts(id, brand, model, type, image_urls, description, created_at)
+      `)
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false });
+
+    setItems((data ?? []).map((row: any) => ({
+      id: row.id,
+      type: row.type,
+      createdAt: row.created_at,
+      isRead: row.is_read,
+      actor: {
+        id: row.actor?.id ?? '',
+        username: row.actor?.username ?? '',
+        avatarUrl: row.actor?.avatar_url ?? '',
+      },
+      post: row.post ? {
+        id: row.post.id,
+        brand: row.post.brand ?? '',
+        model: row.post.model ?? '',
+        type: row.post.type ?? '',
+        imageUrl: row.post.image_urls?.[0] ?? '',
+        description: row.post.description,
+        createdAt: row.post.created_at,
+      } : undefined,
+    })));
+    setLoading(false);
+  }, [user?.id]);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchActivity();
+      if (user?.id) {
+        supabase.from('notifications').update({ is_read: true }).eq('user_id', user.id).eq('is_read', false);
       }
-    };
+    }, [fetchActivity, user?.id])
+  );
 
-    return (
-      <Pressable style={({ pressed }) => [styles.activityItem, pressed && { backgroundColor: VROOM_COLORS.fieldBg }]}>
-        <View style={styles.activityIcon}>{getActivityIcon()}</View>
+  const handlePress = useCallback((item: ActivityItem) => {
+    if (item.type === 'follow') {
+      navigation.navigate('UserProfile', { userId: item.actor.id, username: item.actor.username });
+      return;
+    }
+    if (item.post) {
+      navigation.navigate('PostDetail', {
+        id: item.post.id,
+        name: [item.post.brand, item.post.model].filter(Boolean).join(' ') || item.post.type,
+        image: item.post.imageUrl,
+        description: item.post.description ?? undefined,
+        date: item.post.createdAt ? new Date(item.post.createdAt).toLocaleDateString('fr-FR') : undefined,
+      });
+    }
+  }, [navigation]);
 
-        <View style={styles.activityContent}>
-          <Text style={styles.activityUser}>{item.user}</Text>
-          <Text style={styles.activityAction}>{item.action}</Text>
-          <Text style={styles.activityTime}>{item.time}</Text>
-        </View>
-
-        <Ionicons name="chevron-forward" size={20} color={VROOM_COLORS.muted} />
-      </Pressable>
-    );
+  const getActivityIcon = (type: NotificationType) => {
+    switch (type) {
+      case 'like':    return <Ionicons name="heart" size={20} color={VROOM_COLORS.accent} />;
+      case 'follow':  return <Ionicons name="person-add" size={20} color={VROOM_COLORS.accent} />;
+      case 'comment': return <Ionicons name="chatbubble" size={20} color={VROOM_COLORS.accent} />;
+    }
   };
+
+  const getActionText = (type: NotificationType) => {
+    switch (type) {
+      case 'like':    return t.activity.liked_your_post;
+      case 'comment': return t.activity.commented_on_your_post;
+      case 'follow':  return t.activity.started_following_you;
+    }
+  };
+
+  const renderActivityItem = ({ item }: { item: ActivityItem }) => (
+    <Pressable
+      style={({ pressed }) => [styles.activityItem, pressed && { backgroundColor: VROOM_COLORS.fieldBg }]}
+      onPress={() => handlePress(item)}
+    >
+      <View style={styles.activityIcon}>
+        {item.actor.avatarUrl ? (
+          <ExpoImage source={item.actor.avatarUrl} style={styles.activityAvatar} contentFit="cover" />
+        ) : (
+          getActivityIcon(item.type)
+        )}
+      </View>
+
+      <View style={styles.activityContent}>
+        <Text style={styles.activityUser}>@{item.actor.username}</Text>
+        <Text style={styles.activityAction}>{getActionText(item.type)}</Text>
+        <Text style={styles.activityTime}>{timeAgo(item.createdAt, t.activity)}</Text>
+      </View>
+
+      <Ionicons name="chevron-forward" size={20} color={VROOM_COLORS.muted} />
+    </Pressable>
+  );
 
   return (
     <SafeAreaView style={styles.container}>
@@ -114,19 +169,30 @@ export default function ActivityScreen({ navigation }: ActivityScreenProps) {
         <Pressable onPress={() => navigation.goBack()} hitSlop={15}>
           <Ionicons name="chevron-down" size={32} color={VROOM_COLORS.white} />
         </Pressable>
-        <Text style={styles.headerTitle}>Activity</Text>
+        <Text style={styles.headerTitle}>{t.activity.title}</Text>
         <View style={{ width: 32 }} />
       </View>
 
       {/* === ACTIVITY LIST === */}
-      <FlatList
-        data={ACTIVITY_DATA}
-        keyExtractor={(item) => item.id}
-        renderItem={renderActivityItem}
-        scrollEnabled={true}
-        contentContainerStyle={styles.listContent}
-        ItemSeparatorComponent={() => <View style={styles.divider} />}
-      />
+      {loading ? (
+        <ActivityIndicator color={VROOM_COLORS.accent} style={{ marginTop: 40 }} />
+      ) : (
+        <FlatList
+          data={items}
+          keyExtractor={(item) => item.id}
+          renderItem={renderActivityItem}
+          scrollEnabled={true}
+          contentContainerStyle={styles.listContent}
+          ItemSeparatorComponent={() => <View style={styles.divider} />}
+          ListEmptyComponent={
+            <View style={styles.empty}>
+              <Ionicons name="notifications-outline" size={48} color={VROOM_COLORS.muted} />
+              <Text style={styles.emptyTitle}>{t.activity.empty_title}</Text>
+              <Text style={styles.emptySubtitle}>{t.activity.empty_subtitle}</Text>
+            </View>
+          }
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -156,6 +222,7 @@ const styles = StyleSheet.create({
   // === LIST ===
   listContent: {
     paddingVertical: 0,
+    flexGrow: 1,
   },
 
   // === ACTIVITY ITEM ===
@@ -173,6 +240,11 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(229, 9, 20, 0.1)',
     justifyContent: 'center',
     alignItems: 'center',
+    overflow: 'hidden',
+  },
+  activityAvatar: {
+    width: 44,
+    height: 44,
   },
   activityContent: {
     flex: 1,
@@ -199,5 +271,27 @@ const styles = StyleSheet.create({
     height: 0.5,
     backgroundColor: VROOM_COLORS.border,
     marginHorizontal: CONTAINER_PADDING,
+  },
+
+  // === EMPTY ===
+  empty: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: 80,
+    paddingHorizontal: 40,
+    gap: 12,
+  },
+  emptyTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: VROOM_COLORS.white,
+    textAlign: 'center',
+  },
+  emptySubtitle: {
+    fontSize: 12,
+    color: VROOM_COLORS.muted,
+    textAlign: 'center',
+    lineHeight: 18,
   },
 });

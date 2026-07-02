@@ -25,6 +25,7 @@ import { supabase } from '../supabaseClient';
 import { useAppContext } from '../context/AppContext';
 import { getTranslation } from '../i18n';
 import type { ProfileTag } from '../context/AppContext';
+import StoryViewer from './StoryViewer';
 
 const { width } = Dimensions.get('window');
 
@@ -76,7 +77,7 @@ interface GarageCar {
 export default function ProfileScreen() {
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
-  const { language, user, updateProfileAvatar, markPostDeleted } = useAppContext();
+  const { language, user, updateProfileAvatar, markPostDeleted, highlights, feedStories } = useAppContext();
   const t = getTranslation(language);
 
   const [selectedCarId, setSelectedCarId] = useState<string | null>(null);
@@ -90,55 +91,76 @@ export default function ProfileScreen() {
   const [addSlideAnim] = useState(new Animated.Value(600));
   const [refreshing, setRefreshing] = useState(false);
   const [myPublications, setMyPublications] = useState<any[]>([]);
-  const [highlights] = useState<{ id: string; name: string; image: string }[]>([]);
   const [garageItems, setGarageItems] = useState<GarageCar[]>([]);
+  const [highlightViewerId, setHighlightViewerId] = useState<string | null>(null);
+  const [eventsCount, setEventsCount] = useState(0);
+  const [groupsCount, setGroupsCount] = useState(0);
+  const [trackdaysCount, setTrackdaysCount] = useState(0);
 
-  useEffect(() => {
+  const fetchPublications = useCallback(async () => {
     if (!user?.id) return;
-    supabase
+    const { data } = await supabase
       .from('posts')
       .select('id, type, image_urls, created_at, description, brand, model, location, likes_count, comments_count')
       .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
-      .then(({ data }) => { if (data) setMyPublications(data); });
+      .order('created_at', { ascending: false });
+    if (data) setMyPublications(data);
   }, [user?.id]);
 
-  useEffect(() => {
+  const fetchGarage = useCallback(async () => {
     if (!user?.id) return;
-    supabase
+    const { data } = await supabase
       .from('garage_vehicles')
       .select('*')
       .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
-      .then(({ data }) => {
-        if (!data) return;
-        setGarageItems(data.map((v: any) => ({
-          id: v.id,
-          name: `${v.brand} ${v.model}`,
-          year: String(v.year),
-          body: v.status ?? '—',
-          power: v.power ?? '—',
-          image: v.image_url ?? '',
-          images: [v.image_url ?? ''],
-          specs: {
-            km: v.mileage ? Number(v.mileage).toLocaleString() : '—',
-            motor: v.fuel ?? '—',
-            color: v.color ?? '—',
-            gearbox: v.transmission ?? '—',
-          },
-          history: v.notes ?? '',
-          estCertifie: v.est_certifie ?? false,
-        })));
-      });
+      .order('created_at', { ascending: false });
+    if (!data) return;
+    setGarageItems(data.map((v: any) => ({
+      id: v.id,
+      name: `${v.brand} ${v.model}`,
+      year: String(v.year),
+      body: v.status ?? '—',
+      power: v.power ?? '—',
+      image: v.image_url ?? '',
+      images: [v.image_url ?? ''],
+      specs: {
+        km: v.mileage ? Number(v.mileage).toLocaleString() : '—',
+        motor: v.fuel ?? '—',
+        color: v.color ?? '—',
+        gearbox: v.transmission ?? '—',
+      },
+      history: v.notes ?? '',
+      estCertifie: v.est_certifie ?? false,
+    })));
   }, [user?.id]);
+
+  const fetchStats = useCallback(async () => {
+    if (!user?.id) return;
+    const [groupsRes, eventsRes, trackdaysRes] = await Promise.all([
+      supabase.from('group_members').select('group_id', { count: 'exact', head: true }).eq('user_id', user.id),
+      supabase.from('map_points').select('id', { count: 'exact', head: true }).eq('user_id', user.id).eq('type', 'event'),
+      supabase.from('posts').select('id', { count: 'exact', head: true }).eq('user_id', user.id).eq('type', 'track'),
+    ]);
+    setGroupsCount(groupsRes.count ?? 0);
+    setEventsCount(eventsRes.count ?? 0);
+    setTrackdaysCount(trackdaysRes.count ?? 0);
+  }, [user?.id]);
+
+  useEffect(() => { fetchPublications(); }, [fetchPublications]);
+  useEffect(() => { fetchGarage(); }, [fetchGarage]);
+  useEffect(() => { fetchStats(); }, [fetchStats]);
 
   const selectedCar = garageItems.find((c) => c.id === selectedCarId) ?? null;
   const profileTags: ProfileTag[] = user?.tags ?? [];
+  const highlightStories = feedStories
+    .filter((s) => s.highlightId === highlightViewerId)
+    .map((s) => ({ id: s.id, image: s.imageUrl, userId: s.userId }));
 
-  const onRefresh = useCallback(() => {
+  const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    setTimeout(() => setRefreshing(false), 1200);
-  }, []);
+    await Promise.all([fetchPublications(), fetchGarage(), fetchStats()]);
+    setRefreshing(false);
+  }, [fetchPublications, fetchGarage, fetchStats]);
 
   const openMenu = () => {
     setMenuVisible(true);
@@ -245,11 +267,15 @@ export default function ProfileScreen() {
           onRefresh={onRefresh}
           refreshing={refreshing}
           highlights={highlights}
+          onOpenHighlight={setHighlightViewerId}
           language={language}
           user={user}
           posts={myPublications}
           profileTags={profileTags}
           garageItems={garageItems}
+          eventsCount={eventsCount}
+          groupsCount={groupsCount}
+          trackdaysCount={trackdaysCount}
           pendingAvatarUri={pendingAvatarUri}
           isUploadingAvatar={isUploadingAvatar}
           onPickAvatar={pickAvatar}
@@ -258,6 +284,14 @@ export default function ProfileScreen() {
           onDeletePost={handleDeletePost}
         />
       )}
+
+      <StoryViewer
+        visible={!!highlightViewerId}
+        highlightId={highlightViewerId ?? ''}
+        onClose={() => setHighlightViewerId(null)}
+        stories={highlightStories}
+        currentUserId={user?.id}
+      />
 
       {/* Menu overlay */}
       {menuVisible && <Pressable style={styles.overlay} onPress={closeMenu} />}
@@ -357,9 +391,10 @@ function ActivityCard({ icon, value, label, accent }: {
 // =====================================================================
 function ProfileGridView({
   insets, activeTab, onTabChange, onCarPress, onOpenMenu, onOpenAddSheet,
-  onNavigate, onShareProfile, onRefresh, refreshing, highlights, language,
+  onNavigate, onShareProfile, onRefresh, refreshing, highlights, onOpenHighlight, language,
   user, posts, profileTags, garageItems, pendingAvatarUri, isUploadingAvatar,
   onPickAvatar, onConfirmAvatar, onCancelAvatar, onDeletePost,
+  eventsCount, groupsCount, trackdaysCount,
 }: {
   insets: ReturnType<typeof useSafeAreaInsets>;
   activeTab: string;
@@ -372,11 +407,15 @@ function ProfileGridView({
   onRefresh: () => void;
   refreshing: boolean;
   highlights: { id: string; name: string; image: string }[];
+  onOpenHighlight: (id: string) => void;
   language: any;
   user: any;
   posts: any[];
   profileTags: ProfileTag[];
   garageItems: GarageCar[];
+  eventsCount: number;
+  groupsCount: number;
+  trackdaysCount: number;
   pendingAvatarUri: string | null;
   isUploadingAvatar: boolean;
   onPickAvatar: () => void;
@@ -449,9 +488,9 @@ function ProfileGridView({
           </View>
 
           <View style={styles.statsRow}>
-            <StatColumn value="0" label={t.profile.events} />
+            <StatColumn value={formatCount(eventsCount)} label={t.profile.events} />
             <StatColumn value={formatCount(followersCount)} label={t.profile.followers} />
-            <StatColumn value="0" label={t.profile.groups} />
+            <StatColumn value={formatCount(groupsCount)} label={t.profile.groups} />
           </View>
         </View>
 
@@ -486,9 +525,9 @@ function ProfileGridView({
 
         {/* Activity cards */}
         <View style={styles.activityRow}>
-          <ActivityCard icon="flag-outline"    value="0"                       label={t.profile.events_participations} accent />
+          <ActivityCard icon="flag-outline"    value={formatCount(eventsCount)}   label={t.profile.events_participations} accent />
           <ActivityCard icon="car-sport-outline" value={String(garageItems.length)} label={t.profile.cars_garage} />
-          <ActivityCard icon="speedometer-outline" value="0"                   label={t.profile.trackdays} />
+          <ActivityCard icon="speedometer-outline" value={formatCount(trackdaysCount)} label={t.profile.trackdays} />
         </View>
 
         {/* Highlights */}
@@ -502,7 +541,7 @@ function ProfileGridView({
               <Text style={styles.highlightLabel}>{t.profile.new}</Text>
             </TouchableOpacity>
             {highlights.map((h) => (
-              <TouchableOpacity key={h.id} style={styles.highlightItem}>
+              <TouchableOpacity key={h.id} style={styles.highlightItem} onPress={() => onOpenHighlight(h.id)}>
                 <View style={styles.highlightBubble}>
                   <ExpoImage source={h.image} style={styles.highlightImage} contentFit="cover"
                     placeholder={FALLBACK} cachePolicy="memory-disk" />

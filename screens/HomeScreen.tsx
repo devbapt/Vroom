@@ -57,7 +57,7 @@ function mapRowToPost(row: any, savedIds: Set<string>, likedIds: Set<string>): C
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<any>();
-  const { user, toggleSaveCinePost, deletedPostIds } = useAppContext();
+  const { user, deletedPostIds } = useAppContext();
 
   const [posts, setPosts] = useState<CineDrivePostData[]>([]);
   const [refreshing, setRefreshing] = useState(false);
@@ -153,25 +153,39 @@ export default function HomeScreen() {
 
   const handleToggleLike = useCallback(async (postId: string) => {
     let currentlyLiked = false;
+    let postOwnerId = '';
     setPosts(prev => prev.map(p => {
       if (p.id !== postId) return p;
       currentlyLiked = p.isLiked;
+      postOwnerId = p.user.id;
       return { ...p, isLiked: !p.isLiked, likes: p.isLiked ? p.likes - 1 : p.likes + 1 };
     }));
     if (!user?.id) return;
     if (currentlyLiked) {
       await supabase.from('post_likes').delete().eq('post_id', postId).eq('user_id', user.id);
+      await supabase.from('notifications').delete().match({ actor_id: user.id, post_id: postId, type: 'like' });
     } else {
       await supabase.from('post_likes').insert({ post_id: postId, user_id: user.id });
+      if (postOwnerId && postOwnerId !== user.id) {
+        await supabase.from('notifications').insert({ user_id: postOwnerId, actor_id: user.id, type: 'like', post_id: postId });
+      }
     }
   }, [user?.id]);
 
-  const handleToggleSave = useCallback((postId: string) => {
-    setPosts(prev =>
-      prev.map(p => p.id === postId ? { ...p, isSaved: !p.isSaved } : p)
-    );
-    toggleSaveCinePost(postId);
-  }, [toggleSaveCinePost]);
+  const handleToggleSave = useCallback(async (postId: string) => {
+    let currentlySaved = false;
+    setPosts(prev => prev.map(p => {
+      if (p.id !== postId) return p;
+      currentlySaved = p.isSaved;
+      return { ...p, isSaved: !p.isSaved };
+    }));
+    if (!user?.id) return;
+    if (currentlySaved) {
+      await supabase.from('saved_posts').delete().eq('post_id', postId).eq('user_id', user.id);
+    } else {
+      await supabase.from('saved_posts').insert({ post_id: postId, user_id: user.id });
+    }
+  }, [user?.id]);
 
   // ChapterCard sits just below the HomeHeader bar (56px)
   const chapterTopOffset = insets.top + 56 + 4;

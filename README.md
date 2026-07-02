@@ -240,6 +240,9 @@ Flow complet de vérification en 4 étapes : instructions (défi photo — papie
 ### Vérification VIN et anti-doublon
 Champ VIN (numéro de châssis) optionnel dans le formulaire d'ajout de véhicule, vérifié via l'API publique et gratuite **NHTSA vPIC** (`vpic.nhtsa.dot.gov`) : la marque/modèle/année décodés sont comparés à la saisie utilisateur pour signaler une incohérence avant l'ajout. La plaque et le VIN sont hachés (SHA-256) et stockés dans des colonnes uniques (`plaque_hash`, `vin_hash`) sur `garage_vehicles` — un même véhicule ne peut donc pas être enregistré par deux comptes Vroom différents. En cas de doublon détecté, l'utilisateur est invité à contacter le support plutôt que de se voir proposer une "revendication" automatique non implémentée.
 
+### Carte interactive (events & routes)
+Onglet "Maps" dédié (`MapStackNavigator`) affichant une carte (`react-native-maps`) avec les points partagés par les utilisateurs, deux types : `event` (rassemblement) et `route` (itinéraire). Géolocalisation demandée au chargement (`expo-location`), avec repli sur une région par défaut (Paris) et bannière cliquable vers les réglages en cas de refus. Filtres all/event/route, fiche de détail animée par point (titre, description, date, photo), export vers une app GPS externe (Google Maps/Waze). Ajout d'un point (`AddMapPointScreen`) via position courante ou sélection manuelle sur la carte (marqueur déplaçable), avec upload photo vers le bucket Supabase Storage `map_points`. Suppression réservée à l'auteur du point, via RLS (`map_points_delete`, `auth.uid() = user_id`).
+
 ### Internationalisation
 Système de traductions maison (`i18n.ts`) couvrant 4 namespaces : `profile`, `settings`, `post`, `garage`. Langue persistée dans le contexte global, modifiable depuis les Paramètres (FR/EN).
 

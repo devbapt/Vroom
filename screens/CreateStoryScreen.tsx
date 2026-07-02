@@ -47,6 +47,7 @@ export default function CreateStoryScreen() {
   const [caption, setCaption] = useState('');
   const [addToHighlights, setAddToHighlights] = useState(false);
   const [selectedHighlightId, setSelectedHighlightId] = useState<string>('');
+  const [newHighlightName, setNewHighlightName] = useState('');
   const [isPublishing, setIsPublishing] = useState(false);
 
   const pickImage = useCallback(async () => {
@@ -84,6 +85,10 @@ export default function CreateStoryScreen() {
       return;
     }
     if (!user?.id) return;
+    if (addToHighlights && selectedHighlightId === 'new' && !newHighlightName.trim()) {
+      Alert.alert('Nom requis', 'Donne un nom à ton nouveau highlight.');
+      return;
+    }
 
     setIsPublishing(true);
     try {
@@ -105,10 +110,21 @@ export default function CreateStoryScreen() {
         publicUrl = urlData.publicUrl;
       }
 
+      let highlightId: string | null = null;
+      if (addToHighlights) {
+        if (selectedHighlightId === 'new') {
+          const created = await addHighlight(newHighlightName.trim(), publicUrl);
+          highlightId = created?.id ?? null;
+        } else if (selectedHighlightId) {
+          highlightId = selectedHighlightId;
+        }
+      }
+
       const { error: insertError } = await supabase.from('stories').insert({
         user_id: user.id,
         image_url: publicUrl,
         caption: caption.trim() || null,
+        highlight_id: highlightId,
       });
 
       if (insertError) throw insertError;
@@ -121,22 +137,13 @@ export default function CreateStoryScreen() {
         imageUrl: publicUrl,
       });
 
-      if (addToHighlights && !selectedHighlightId) {
-        addHighlight({
-          id: Date.now().toString(),
-          name: 'Story',
-          image: publicUrl,
-          storyCount: 1,
-        });
-      }
-
       navigation.goBack();
     } catch (_) {
       Alert.alert('Erreur', 'Impossible de publier la story.');
     } finally {
       setIsPublishing(false);
     }
-  }, [imageUri, imageBase64, isPublishing, user, caption, addFeedStory, addToHighlights, selectedHighlightId, addHighlight, navigation]);
+  }, [imageUri, imageBase64, isPublishing, user, caption, addFeedStory, addToHighlights, selectedHighlightId, newHighlightName, addHighlight, navigation]);
 
   return (
     <KeyboardAvoidingView
@@ -255,6 +262,17 @@ export default function CreateStoryScreen() {
                   </Text>
                 </Pressable>
               </ScrollView>
+
+              {selectedHighlightId === 'new' && (
+                <TextInput
+                  style={[styles.captionInput, { minHeight: 44, marginTop: 10 }]}
+                  value={newHighlightName}
+                  onChangeText={(v) => v.length <= 30 && setNewHighlightName(v)}
+                  placeholder="Nom du highlight (ex : Trackdays)"
+                  placeholderTextColor={C.placeholder}
+                  selectionColor={C.accent}
+                />
+              )}
             </View>
           )}
         </View>

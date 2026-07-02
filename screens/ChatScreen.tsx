@@ -373,13 +373,12 @@ export default function ChatScreen() {
           <Ionicons name="chevron-back" size={26} color={C.accent} />
         </Pressable>
 
-        <Pressable style={styles.headerCenter} onPress={() => {}}>
+        <Pressable
+          style={styles.headerCenter}
+          onPress={() => navigation.navigate('UserProfile', { userId: otherUser.id, username: otherUser.username })}
+        >
           <UserAvatar user={otherUser} size={38} />
           <Text style={styles.headerName} numberOfLines={1}>@{otherUser.username}</Text>
-        </Pressable>
-
-        <Pressable hitSlop={12} style={styles.headerRight}>
-          <Ionicons name="call-outline" size={20} color={C.muted} />
         </Pressable>
       </View>
 
@@ -482,7 +481,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   headerName: { fontSize: 15, fontWeight: '700', color: C.white },
-  headerRight:  { padding: 6 },
   avatarFallback: { backgroundColor: C.accent, justifyContent: 'center', alignItems: 'center' },
   avatarText:     { color: '#FFF', fontSize: 12, fontWeight: '700' },
 

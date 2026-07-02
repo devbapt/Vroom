@@ -34,14 +34,6 @@ export interface CineDrivePost {
   isLive?: boolean;
 }
 
-export interface LiveUser {
-  id: string;
-  username: string;
-  avatar: string;
-  isLive: boolean;
-  lastActiveText?: string;
-}
-
 // ─── Feed Story Types ─────────────────────────────────────────────────────────
 
 export interface FeedStory {
@@ -52,6 +44,7 @@ export interface FeedStory {
   imageUrl: string;
   createdAt: string;
   viewedBy: string[];
+  highlightId?: string | null;
 }
 
 // ─── Vehicle Types ────────────────────────────────────────────────────────────
@@ -60,27 +53,6 @@ export type VehicleTransmission = 'MT' | 'AT' | 'DCT' | 'PDK' | 'CVT';
 export type VehicleDrivetrain   = 'RWD' | 'FWD' | 'AWD' | '4WD';
 export type VehicleFuel         = 'gasoline' | 'diesel' | 'hybrid' | 'electric';
 export type VehicleStatus       = 'daily' | 'weekend' | 'track' | 'show' | 'project';
-
-export interface Vehicle {
-  id: string;
-  userId: string;
-  imageUrl: string;
-  brand: string;
-  model: string;
-  year: number;
-  nickname?: string;
-  power?: string;
-  acceleration?: string;
-  transmission?: VehicleTransmission;
-  drivetrain?: VehicleDrivetrain;
-  fuel?: VehicleFuel;
-  color?: string;
-  mileage?: number;
-  acquiredAt?: string;
-  status?: VehicleStatus;
-  notes?: string;
-  createdAt: string;
-}
 
 // ─── Other types ──────────────────────────────────────────────────────────────
 
@@ -99,17 +71,6 @@ export interface Story {
   viewedBy?: string[];
 }
 
-export interface Post {
-  id: string;
-  title: string;
-  image: string;
-  description?: string;
-  likes: number;
-  comments: number;
-  shares: number;
-  isSaved?: boolean;
-}
-
 export interface ProfileTag {
   id: string;
   label: string;
@@ -126,6 +87,8 @@ export interface UserProfile {
   followingCount: number;
   postsCount: number;
   isPrivate: boolean;
+  notifPush: boolean;
+  notifEmail: boolean;
   tags?: ProfileTag[];
 }
 
@@ -138,14 +101,9 @@ export interface AppContextType {
   refreshProfile: (userId: string) => Promise<void>;
 
   highlights: Highlight[];
-  addHighlight: (highlight: Highlight) => void;
-  deleteHighlight: (id: string) => void;
-
-  posts: Post[];
-  addPost: (post: Post) => void;
-  likePost: (postId: string) => void;
-  savePost: (postId: string) => void;
-  deletePost: (postId: string) => void;
+  addHighlight: (name: string, coverImage?: string) => Promise<Highlight | null>;
+  deleteHighlight: (id: string) => Promise<void>;
+  loadHighlights: (userId: string) => Promise<void>;
 
   unreadCount: number;
   markAsRead: () => void;
@@ -153,13 +111,6 @@ export interface AppContextType {
   language: Language;
   setLanguage: (lang: Language) => void;
 
-  // Cine Drive Feed
-  cinePosts: CineDrivePost[];
-  savedCinePosts: CineDrivePost[];
-  liveUsers: LiveUser[];
-  toggleLikeCinePost: (postId: string) => void;
-  toggleSaveCinePost: (postId: string) => void;
-  addCinePost: (post: CineDrivePost) => void;
   deletedPostIds: string[];
   markPostDeleted: (postId: string) => void;
 
@@ -169,11 +120,6 @@ export interface AppContextType {
   addFeedStory: (story: Omit<FeedStory, 'id' | 'createdAt' | 'viewedBy'>) => void;
   removeFeedStory: (storyId: string) => void;
   loadStories: () => Promise<void>;
-
-  // Vehicles (garage)
-  vehicles: Vehicle[];
-  addVehicle: (v: Omit<Vehicle, 'id' | 'userId' | 'createdAt'>) => void;
-  removeVehicle: (id: string) => void;
 
   // Welcome screen after signup
   showWelcome: boolean;
@@ -188,14 +134,10 @@ const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000;
 export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [highlights, setHighlights] = useState<Highlight[]>([]);
-  const [posts, setPosts] = useState<Post[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [language, setLanguageState] = useState<Language>('fr');
-  const [cinePosts, setCinePosts] = useState<CineDrivePost[]>([]);
-  const [liveUsers] = useState<LiveUser[]>([]);
   const [deletedPostIds, setDeletedPostIds] = useState<string[]>([]);
   const [feedStories, setFeedStories] = useState<FeedStory[]>([]);
-  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [showWelcome, setShowWelcome] = useState(false);
 
   const triggerWelcome = useCallback(() => setShowWelcome(true), []);
@@ -221,76 +163,49 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     console.log('[AppContext:updateProfileAvatar] done');
   }, [user?.id]);
 
-  const addHighlight = useCallback((highlight: Highlight) => {
-    setHighlights(prev => [...prev, highlight]);
-  }, []);
+  const addHighlight = useCallback(async (name: string, coverImage?: string) => {
+    if (!user?.id) return null;
+    const { data, error } = await supabase
+      .from('highlights')
+      .insert({ user_id: user.id, name, cover_image: coverImage ?? null })
+      .select()
+      .single();
+    if (error || !data) return null;
+    const newHighlight: Highlight = {
+      id: data.id,
+      name: data.name,
+      image: data.cover_image ?? '',
+      createdAt: new Date(data.created_at).getTime(),
+      storyCount: 0,
+    };
+    setHighlights(prev => [newHighlight, ...prev]);
+    return newHighlight;
+  }, [user?.id]);
 
-  const deleteHighlight = useCallback((id: string) => {
+  const deleteHighlight = useCallback(async (id: string) => {
+    await supabase.from('highlights').delete().eq('id', id);
     setHighlights(prev => prev.filter(h => h.id !== id));
   }, []);
 
-  const addPost = useCallback((post: Post) => {
-    setPosts(prev => [post, ...prev]);
-  }, []);
-
-  const likePost = useCallback((postId: string) => {
-    setPosts(prev => prev.map(p => p.id === postId ? { ...p, likes: p.likes + 1 } : p));
-  }, []);
-
-  const savePost = useCallback((postId: string) => {
-    setPosts(prev => prev.map(p => p.id === postId ? { ...p, isSaved: !p.isSaved } : p));
-  }, []);
-
-  const deletePost = useCallback((postId: string) => {
-    setPosts(prev => prev.filter(p => p.id !== postId));
+  const loadHighlights = useCallback(async (userId: string) => {
+    const { data } = await supabase
+      .from('highlights')
+      .select('id, name, cover_image, created_at, stories(count)')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+    if (!data) return;
+    setHighlights(data.map((row: any) => ({
+      id: row.id,
+      name: row.name,
+      image: row.cover_image ?? '',
+      createdAt: new Date(row.created_at).getTime(),
+      storyCount: row.stories?.[0]?.count ?? 0,
+    })));
   }, []);
 
   const markAsRead = useCallback(() => { setUnreadCount(0); }, []);
 
   const changeLanguage = useCallback((lang: Language) => { setLanguageState(lang); }, []);
-
-  const toggleLikeCinePost = useCallback(async (postId: string) => {
-    let currentlyLiked = false;
-    setCinePosts(prev => {
-      const post = prev.find(p => p.id === postId);
-      currentlyLiked = post?.isLiked ?? false;
-      return prev.map(p =>
-        p.id === postId
-          ? { ...p, isLiked: !p.isLiked, likes: p.isLiked ? p.likes - 1 : p.likes + 1 }
-          : p
-      );
-    });
-
-    if (!user?.id) return;
-
-    if (currentlyLiked) {
-      await supabase.from('post_likes').delete().eq('post_id', postId).eq('user_id', user.id);
-    } else {
-      await supabase.from('post_likes').insert({ post_id: postId, user_id: user.id });
-    }
-  }, [user?.id]);
-
-  const toggleSaveCinePost = useCallback(async (postId: string) => {
-    // Read current saved state before optimistic update
-    let currentlySaved = false;
-    setCinePosts(prev => {
-      const post = prev.find(p => p.id === postId);
-      currentlySaved = post?.isSaved ?? false;
-      return prev.map(p => p.id === postId ? { ...p, isSaved: !p.isSaved } : p);
-    });
-
-    if (!user?.id) return;
-
-    if (currentlySaved) {
-      await supabase.from('saved_posts').delete().eq('post_id', postId).eq('user_id', user.id);
-    } else {
-      await supabase.from('saved_posts').insert({ post_id: postId, user_id: user.id });
-    }
-  }, [user?.id]);
-
-  const addCinePost = useCallback((post: CineDrivePost) => {
-    setCinePosts(prev => [post, ...prev]);
-  }, []);
 
   const markPostDeleted = useCallback((postId: string) => {
     setDeletedPostIds(prev => [...prev, postId]);
@@ -326,8 +241,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
     const { data } = await supabase
       .from('stories')
-      .select('id, user_id, image_url, created_at, profiles!user_id(id, username, avatar_url)')
-      .gte('created_at', since)
+      .select('id, user_id, image_url, created_at, highlight_id, profiles!user_id(id, username, avatar_url)')
+      .or(`created_at.gte.${since},highlight_id.not.is.null`)
       .order('created_at', { ascending: false });
 
     if (!data) return;
@@ -339,28 +254,14 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       imageUrl: row.image_url,
       createdAt: row.created_at,
       viewedBy: [],
+      highlightId: row.highlight_id,
     })));
-  }, []);
-
-  // Vehicles
-  const addVehicle = useCallback((v: Omit<Vehicle, 'id' | 'userId' | 'createdAt'>) => {
-    const newVehicle: Vehicle = {
-      ...v,
-      id: Date.now().toString(),
-      userId: user?.id ?? '',
-      createdAt: new Date().toISOString(),
-    };
-    setVehicles(prev => [newVehicle, ...prev]);
-  }, [user]);
-
-  const removeVehicle = useCallback((id: string) => {
-    setVehicles(prev => prev.filter(v => v.id !== id));
   }, []);
 
   const fetchAndSetProfile = async (userId: string) => {
     const { data } = await supabase
       .from('profiles')
-      .select('id, username, full_name, avatar_url, bio, followers_count')
+      .select('id, username, full_name, avatar_url, bio, followers_count, following_count, posts_count, is_private, notif_push, notif_email, tags')
       .eq('id', userId)
       .single();
     setUser({
@@ -370,36 +271,35 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       avatar: data?.avatar_url ?? '',
       bio: data?.bio ?? '',
       followersCount: data?.followers_count ?? 0,
-      followingCount: 0,
-      postsCount: 0,
-      isPrivate: false,
-      tags: [],
+      followingCount: data?.following_count ?? 0,
+      postsCount: data?.posts_count ?? 0,
+      isPrivate: data?.is_private ?? false,
+      notifPush: data?.notif_push ?? true,
+      notifEmail: data?.notif_email ?? false,
+      tags: data?.tags ?? [],
     });
   };
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) { fetchAndSetProfile(session.user.id); loadStories(); }
+      if (session?.user) { fetchAndSetProfile(session.user.id); loadStories(); loadHighlights(session.user.id); }
     });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user) {
         fetchAndSetProfile(session.user.id);
         loadStories();
+        loadHighlights(session.user.id);
       } else {
         setUser(null);
         setHighlights([]);
-        setPosts([]);
-        setCinePosts([]);
         setFeedStories([]);
-        setVehicles([]);
       }
     });
     return () => subscription.unsubscribe();
   }, []);
 
-  const savedCinePosts = cinePosts.filter(p => p.isSaved);
   const activeStories = feedStories.filter(
-    s => Date.now() - new Date(s.createdAt).getTime() < TWENTY_FOUR_HOURS
+    s => s.highlightId || Date.now() - new Date(s.createdAt).getTime() < TWENTY_FOUR_HOURS
   );
 
   const value: AppContextType = {
@@ -410,21 +310,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     highlights,
     addHighlight,
     deleteHighlight,
-    posts,
-    addPost,
-    likePost,
-    savePost,
-    deletePost,
+    loadHighlights,
     unreadCount,
     markAsRead,
     language,
     setLanguage: changeLanguage,
-    cinePosts,
-    savedCinePosts,
-    liveUsers,
-    toggleLikeCinePost,
-    toggleSaveCinePost,
-    addCinePost,
     deletedPostIds,
     markPostDeleted,
     feedStories: activeStories,
@@ -432,9 +322,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     addFeedStory,
     removeFeedStory,
     loadStories,
-    vehicles,
-    addVehicle,
-    removeVehicle,
     showWelcome,
     triggerWelcome,
     dismissWelcome,

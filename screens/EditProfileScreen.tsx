@@ -128,6 +128,7 @@ export default function EditProfileScreen({ navigation }: EditProfileScreenProps
           username: trimmedUsername,
           bio: bio.trim(),
           avatar_url: finalAvatarUrl || null,
+          tags,
         });
 
       if (dbError) {

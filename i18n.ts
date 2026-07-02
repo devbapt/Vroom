@@ -185,6 +185,18 @@ export interface Translations {
     by: string;
     emptyHint: string;
   };
+  activity: {
+    title: string;
+    liked_your_post: string;
+    commented_on_your_post: string;
+    started_following_you: string;
+    empty_title: string;
+    empty_subtitle: string;
+    just_now: string;
+    minutes_suffix: string;
+    hours_suffix: string;
+    days_suffix: string;
+  };
 }
 
 const FR: Translations = {
@@ -367,6 +379,18 @@ const FR: Translations = {
     by: 'par',
     emptyHint: 'Aucun point pour l\'instant — sois le premier à en ajouter un !',
   },
+  activity: {
+    title: 'Activité',
+    liked_your_post: 'a aimé ta publication',
+    commented_on_your_post: 'a commenté ta publication',
+    started_following_you: 's\'est abonné(e) à toi',
+    empty_title: 'Aucune activité pour le moment',
+    empty_subtitle: 'Les likes, commentaires et nouveaux abonnés apparaîtront ici',
+    just_now: 'à l\'instant',
+    minutes_suffix: 'min',
+    hours_suffix: 'h',
+    days_suffix: 'j',
+  },
 };
 
 const EN: Translations = {
@@ -548,6 +572,18 @@ const EN: Translations = {
     errorMsg: 'Unable to publish this point.',
     by: 'by',
     emptyHint: 'No points yet — be the first to add one!',
+  },
+  activity: {
+    title: 'Activity',
+    liked_your_post: 'liked your post',
+    commented_on_your_post: 'commented on your post',
+    started_following_you: 'started following you',
+    empty_title: 'No activity yet',
+    empty_subtitle: 'Likes, comments and new followers will show up here',
+    just_now: 'just now',
+    minutes_suffix: 'm',
+    hours_suffix: 'h',
+    days_suffix: 'd',
   },
 };
 

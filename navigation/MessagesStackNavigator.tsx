@@ -4,6 +4,7 @@ import MessagesScreen    from '../screens/MessagesScreen';
 import ChatScreen        from '../screens/ChatScreen';
 import CreateGroupScreen from '../screens/CreateGroupScreen';
 import GroupDetailScreen from '../screens/GroupDetailScreen';
+import UserProfileScreen from '../screens/UserProfileScreen';
 import type { ChatUser } from '../hooks/useMessages';
 
 export type MessagesStackParamList = {
@@ -11,6 +12,7 @@ export type MessagesStackParamList = {
   Chat:        { conversationId: string; otherUser: ChatUser };
   CreateGroup: undefined;
   GroupDetail: { groupId: string; groupName: string };
+  UserProfile: { userId: string; username: string };
 };
 
 const Stack = createStackNavigator<MessagesStackParamList>();
@@ -28,6 +30,7 @@ export default function MessagesStackNavigator() {
       <Stack.Screen name="ConversationList" component={MessagesScreen} />
       <Stack.Screen name="Chat"             component={ChatScreen} />
       <Stack.Screen name="GroupDetail"       component={GroupDetailScreen} />
+      <Stack.Screen name="UserProfile"       component={UserProfileScreen} />
       {/* Slide from bottom — création de groupe */}
       <Stack.Screen
         name="CreateGroup"
