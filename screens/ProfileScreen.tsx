@@ -26,6 +26,7 @@ import { useAppContext } from '../context/AppContext';
 import { getTranslation } from '../i18n';
 import type { ProfileTag } from '../context/AppContext';
 import StoryViewer from './StoryViewer';
+import ExpandableText from '../components/ui/ExpandableText';
 
 const { width } = Dimensions.get('window');
 
@@ -97,6 +98,13 @@ export default function ProfileScreen() {
   const [groupsCount, setGroupsCount] = useState(0);
   const [trackdaysCount, setTrackdaysCount] = useState(0);
 
+  const [routesSubTab, setRoutesSubTab] = useState<'recorded' | 'published' | 'favorites'>('recorded');
+  const [savedRoutes, setSavedRoutes] = useState<any[]>([]);
+  const [publishedRoutes, setPublishedRoutes] = useState<any[]>([]);
+  const [favoriteRoutes, setFavoriteRoutes] = useState<any[]>([]);
+  const [routesLoading, setRoutesLoading] = useState(false);
+  const [routesLoaded, setRoutesLoaded] = useState(false);
+
   const fetchPublications = useCallback(async () => {
     if (!user?.id) return;
     const { data } = await supabase
@@ -146,9 +154,27 @@ export default function ProfileScreen() {
     setTrackdaysCount(trackdaysRes.count ?? 0);
   }, [user?.id]);
 
+  const fetchRoutes = useCallback(async () => {
+    if (!user?.id) return;
+    setRoutesLoading(true);
+    const [savedRes, publishedRes, favRes] = await Promise.all([
+      supabase.from('saved_routes').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
+      supabase.from('map_points').select('*').eq('user_id', user.id).eq('type', 'route').order('created_at', { ascending: false }),
+      supabase.from('saved_route_favorites').select('map_point_id, map_points(*)').eq('user_id', user.id).order('created_at', { ascending: false }),
+    ]);
+    setSavedRoutes(savedRes.data ?? []);
+    setPublishedRoutes(publishedRes.data ?? []);
+    setFavoriteRoutes((favRes.data ?? []).map((r: any) => r.map_points).filter(Boolean));
+    setRoutesLoading(false);
+    setRoutesLoaded(true);
+  }, [user?.id]);
+
   useEffect(() => { fetchPublications(); }, [fetchPublications]);
   useEffect(() => { fetchGarage(); }, [fetchGarage]);
   useEffect(() => { fetchStats(); }, [fetchStats]);
+  useEffect(() => {
+    if (activeTab === 'itineraires' && !routesLoaded) fetchRoutes();
+  }, [activeTab, routesLoaded, fetchRoutes]);
 
   const selectedCar = garageItems.find((c) => c.id === selectedCarId) ?? null;
   const profileTags: ProfileTag[] = user?.tags ?? [];
@@ -158,9 +184,12 @@ export default function ProfileScreen() {
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await Promise.all([fetchPublications(), fetchGarage(), fetchStats()]);
+    await Promise.all([
+      fetchPublications(), fetchGarage(), fetchStats(),
+      activeTab === 'itineraires' ? fetchRoutes() : Promise.resolve(),
+    ]);
     setRefreshing(false);
-  }, [fetchPublications, fetchGarage, fetchStats]);
+  }, [fetchPublications, fetchGarage, fetchStats, fetchRoutes, activeTab]);
 
   const openMenu = () => {
     setMenuVisible(true);
@@ -273,6 +302,12 @@ export default function ProfileScreen() {
           posts={myPublications}
           profileTags={profileTags}
           garageItems={garageItems}
+          routesSubTab={routesSubTab}
+          onRoutesSubTabChange={setRoutesSubTab}
+          savedRoutes={savedRoutes}
+          publishedRoutes={publishedRoutes}
+          favoriteRoutes={favoriteRoutes}
+          routesLoading={routesLoading}
           eventsCount={eventsCount}
           groupsCount={groupsCount}
           trackdaysCount={trackdaysCount}
@@ -395,6 +430,7 @@ function ProfileGridView({
   user, posts, profileTags, garageItems, pendingAvatarUri, isUploadingAvatar,
   onPickAvatar, onConfirmAvatar, onCancelAvatar, onDeletePost,
   eventsCount, groupsCount, trackdaysCount,
+  routesSubTab, onRoutesSubTabChange, savedRoutes, publishedRoutes, favoriteRoutes, routesLoading,
 }: {
   insets: ReturnType<typeof useSafeAreaInsets>;
   activeTab: string;
@@ -422,6 +458,12 @@ function ProfileGridView({
   onConfirmAvatar: () => void;
   onCancelAvatar: () => void;
   onDeletePost: (postId: string) => void;
+  routesSubTab: 'recorded' | 'published' | 'favorites';
+  onRoutesSubTabChange: (tab: 'recorded' | 'published' | 'favorites') => void;
+  savedRoutes: any[];
+  publishedRoutes: any[];
+  favoriteRoutes: any[];
+  routesLoading: boolean;
 }) {
   const t = getTranslation(language);
   const username     = user?.username ?? '';
@@ -570,9 +612,9 @@ function ProfileGridView({
           })}
         </View>
 
-        {/* Garage grid */}
+        {/* Garage — liste pleine largeur */}
         {activeTab === 'garage' && (
-          <View style={styles.grid}>
+          <View style={styles.garageList}>
             {garageItems.length === 0 ? (
               <View style={styles.emptyTab}>
                 <Ionicons name="car-outline" size={38} color={C.muted} />
@@ -580,32 +622,40 @@ function ProfileGridView({
               </View>
             ) : (
               garageItems.map((car) => (
-                <Pressable key={car.id} style={styles.card} onPress={() => onCarPress(car.id)}>
-                  <ExpoImage source={car.image} style={StyleSheet.absoluteFill}
-                    contentFit="cover" placeholder={FALLBACK} cachePolicy="memory-disk" />
+                <Pressable key={car.id} style={styles.garageCard} onPress={() => onCarPress(car.id)}>
+                  <View style={styles.garageCardImageWrap}>
+                    <ExpoImage source={car.image} style={styles.garageCardImage}
+                      contentFit="cover" placeholder={FALLBACK} cachePolicy="memory-disk" />
 
-                  {/* Badge certifié ou en attente */}
-                  {car.estCertifie ? (
-                    <View style={styles.cardBadge}>
-                      <VerifiedBadge variant="certified" size="sm" />
-                    </View>
-                  ) : (
-                    <Pressable
-                      style={styles.certifyBtn}
-                      onPress={() => onNavigate('Certification', { vehiculeId: car.id, vehiculeName: car.name })}
-                      hitSlop={4}
-                    >
-                      <Ionicons name="shield-outline" size={11} color="rgba(255,255,255,0.7)" />
-                    </Pressable>
-                  )}
+                    {/* Badge certifié ou en attente */}
+                    {car.estCertifie ? (
+                      <View style={styles.cardBadge}>
+                        <VerifiedBadge variant="certified" size="sm" />
+                      </View>
+                    ) : (
+                      <Pressable
+                        style={styles.certifyBtn}
+                        onPress={() => onNavigate('Certification', { vehiculeId: car.id, vehiculeName: car.name })}
+                        hitSlop={4}
+                      >
+                        <Ionicons name="shield-outline" size={11} color="rgba(255,255,255,0.7)" />
+                      </Pressable>
+                    )}
+                  </View>
 
-                  <LinearGradient
-                    colors={['transparent', 'rgba(0,0,0,0.82)']}
-                    style={styles.cardOverlay}
-                  >
-                    <Text style={styles.cardTitle} numberOfLines={1}>{car.name}</Text>
-                    <Text style={styles.cardSubtitle}>{car.year}</Text>
-                  </LinearGradient>
+                  <View style={styles.garageCardBody}>
+                    <Text style={styles.garageCardTitle} numberOfLines={1}>{car.name}</Text>
+                    <Text style={styles.garageCardSubtitle}>{car.year}</Text>
+                    {car.history.length > 0 && (
+                      <ExpandableText
+                        text={car.history}
+                        numberOfLines={2}
+                        style={styles.garageCardNotes}
+                        expandLabel={t.profile.showMore ?? 'Voir plus'}
+                        collapseLabel={t.profile.showLess ?? 'Voir moins'}
+                      />
+                    )}
+                  </View>
                 </Pressable>
               ))
             )}
@@ -697,9 +747,94 @@ function ProfileGridView({
 
         {/* Itinéraires */}
         {activeTab === 'itineraires' && (
-          <View style={styles.emptyTab}>
-            <Ionicons name="map-outline" size={38} color={C.muted} />
-            <Text style={styles.emptyTabText}>Bientôt disponible</Text>
+          <View style={styles.routesTabWrap}>
+            <View style={styles.routesActionsRow}>
+              <Pressable style={styles.routesActionBtn} onPress={() => onNavigate('RecordRoute')}>
+                <Ionicons name="navigate-outline" size={15} color={C.white} />
+                <Text style={styles.routesActionBtnText}>{t.map.recordRoute}</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.routesActionBtn, styles.routesActionBtnGhost]}
+                onPress={() => onNavigate('Maps', { screen: 'AddMapPoint' })}
+              >
+                <Ionicons name="add-outline" size={15} color={C.accent} />
+                <Text style={[styles.routesActionBtnText, styles.routesActionBtnTextGhost]}>{t.map.typeRoute}</Text>
+              </Pressable>
+            </View>
+
+            <View style={styles.routesSubTabRow}>
+              {([
+                { key: 'recorded' as const,  label: t.map.recordedRoutesTab },
+                { key: 'published' as const, label: t.map.publishedRoutesTab },
+                { key: 'favorites' as const, label: t.map.favoriteRoutesTab },
+              ]).map((tab) => {
+                const isActive = routesSubTab === tab.key;
+                return (
+                  <Pressable
+                    key={tab.key}
+                    style={[styles.routesSubTabChip, isActive && styles.routesSubTabChipActive]}
+                    onPress={() => onRoutesSubTabChange(tab.key)}
+                  >
+                    <Text style={[styles.routesSubTabText, isActive && styles.routesSubTabTextActive]}>{tab.label}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            {routesLoading ? (
+              <ActivityIndicator color={C.accent} style={{ marginTop: 30 }} />
+            ) : routesSubTab === 'recorded' ? (
+              savedRoutes.length === 0 ? (
+                <View style={styles.emptyTab}>
+                  <Ionicons name="navigate-outline" size={34} color={C.muted} />
+                  <Text style={styles.emptyTabText}>{t.map.noSavedRoutes}</Text>
+                </View>
+              ) : (
+                savedRoutes.map((r: any) => (
+                  <View key={r.id} style={styles.routeCard}>
+                    <Text style={styles.routeCardTitle} numberOfLines={1}>{r.title}</Text>
+                    <View style={styles.routeCardStatsRow}>
+                      <Text style={styles.routeCardStat}>{Number(r.distance_km).toFixed(2)} km</Text>
+                      <Text style={styles.routeCardStat}>
+                        {Math.floor(r.duration_seconds / 60)} min
+                      </Text>
+                    </View>
+                  </View>
+                ))
+              )
+            ) : routesSubTab === 'published' ? (
+              publishedRoutes.length === 0 ? (
+                <View style={styles.emptyTab}>
+                  <Ionicons name="flag-outline" size={34} color={C.muted} />
+                  <Text style={styles.emptyTabText}>{t.map.noPublishedRoutes}</Text>
+                </View>
+              ) : (
+                publishedRoutes.map((r: any) => (
+                  <View key={r.id} style={styles.routeCard}>
+                    <Text style={styles.routeCardTitle} numberOfLines={1}>{r.title}</Text>
+                    {r.description ? (
+                      <Text style={styles.routeCardDesc} numberOfLines={2}>{r.description}</Text>
+                    ) : null}
+                  </View>
+                ))
+              )
+            ) : (
+              favoriteRoutes.length === 0 ? (
+                <View style={styles.emptyTab}>
+                  <Ionicons name="bookmark-outline" size={34} color={C.muted} />
+                  <Text style={styles.emptyTabText}>{t.map.noFavoriteRoutes}</Text>
+                </View>
+              ) : (
+                favoriteRoutes.map((r: any) => (
+                  <View key={r.id} style={styles.routeCard}>
+                    <Text style={styles.routeCardTitle} numberOfLines={1}>{r.title}</Text>
+                    {r.description ? (
+                      <Text style={styles.routeCardDesc} numberOfLines={2}>{r.description}</Text>
+                    ) : null}
+                  </View>
+                ))
+              )
+            )}
           </View>
         )}
       </ScrollView>
@@ -922,6 +1057,23 @@ const styles = StyleSheet.create({
   // 2-column grid
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: CARD_GAP, paddingTop: CARD_GAP },
 
+  // Garage — liste 1 colonne pleine largeur, image 16:9
+  garageList: { paddingTop: CARD_GAP, gap: 14 },
+  garageCard: {
+    width: '100%',
+    backgroundColor: C.bgCard,
+    borderRadius: 14,
+    overflow: 'hidden',
+    borderWidth: 0.5,
+    borderColor: C.border,
+  },
+  garageCardImageWrap: { width: '100%', aspectRatio: 16 / 9 },
+  garageCardImage: { width: '100%', height: '100%' },
+  garageCardBody: { padding: 12, gap: 3 },
+  garageCardTitle: { color: C.white, fontSize: 14, fontWeight: '700' },
+  garageCardSubtitle: { color: C.whiteSoft, fontSize: 11, marginBottom: 4 },
+  garageCardNotes: { color: C.whiteSoft, fontSize: 12, lineHeight: 17 },
+
   card: {
     width: CARD_WIDTH,
     height: CARD_HEIGHT,
@@ -969,6 +1121,35 @@ const styles = StyleSheet.create({
 
   emptyTab: { width: '100%', alignItems: 'center', paddingVertical: 60, gap: 12 },
   emptyTabText: { color: C.muted, fontSize: 12 },
+
+  // Itinéraires
+  routesTabWrap: { width: '100%', paddingTop: 4, gap: 14 },
+  routesActionsRow: { flexDirection: 'row', gap: 10 },
+  routesActionBtn: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+    backgroundColor: C.accent, borderRadius: 10, paddingVertical: 11,
+  },
+  routesActionBtnGhost: { backgroundColor: 'transparent', borderWidth: 1, borderColor: C.accent },
+  routesActionBtnText: { fontSize: 12.5, fontWeight: '700', color: C.white },
+  routesActionBtnTextGhost: { color: C.accent },
+
+  routesSubTabRow: { flexDirection: 'row', gap: 8 },
+  routesSubTabChip: {
+    flex: 1, alignItems: 'center', paddingVertical: 8, borderRadius: 8,
+    backgroundColor: C.bgCard, borderWidth: 0.5, borderColor: C.border,
+  },
+  routesSubTabChipActive: { backgroundColor: C.bgElevated, borderColor: C.accent },
+  routesSubTabText: { fontSize: 11, fontWeight: '600', color: C.muted },
+  routesSubTabTextActive: { color: C.white },
+
+  routeCard: {
+    backgroundColor: C.bgCard, borderRadius: 12, borderWidth: 0.5, borderColor: C.border,
+    padding: 14, marginBottom: 10,
+  },
+  routeCardTitle: { fontSize: 14, fontWeight: '700', color: C.white, marginBottom: 4 },
+  routeCardStatsRow: { flexDirection: 'row', gap: 14 },
+  routeCardStat: { fontSize: 12, color: C.whiteSoft },
+  routeCardDesc: { fontSize: 12, color: C.whiteSoft, lineHeight: 17 },
 
   // Car Detail
   detailRoot: { flex: 1, backgroundColor: C.bg },

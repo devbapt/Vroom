@@ -16,6 +16,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import ChapterCard from './ChapterCard';
 import ActionStack from './ActionStack';
 import HUDStrip from './HUDStrip';
+import ExpandableText from '../ui/ExpandableText';
 import type { CineDrivePost as CineDrivePostType } from '../../context/AppContext';
 import type { BuildHUD } from '../../context/AppContext';
 
@@ -214,6 +215,17 @@ function CineDrivePost({ post, index, postHeight, chapterTopOffset, onLike, onSa
         onComment={onComment}
       />
 
+      {/* Description — au-dessus du bloc auteur */}
+      {post.description ? (
+        <View style={styles.descriptionBlock} pointerEvents="box-none">
+          <ExpandableText
+            text={post.description}
+            numberOfLines={2}
+            style={styles.descriptionText}
+          />
+        </View>
+      ) : null}
+
       {/* Author block — bottom left */}
       <AuthorBlock post={post} onUserPress={onUserPress} />
 
@@ -260,6 +272,19 @@ const styles = StyleSheet.create({
   pageTickInactive: {
     width: 7,
     backgroundColor: C.pageInactive,
+  },
+
+  // Description block — sits above the author block, clear of ActionStack
+  descriptionBlock: {
+    position: 'absolute',
+    bottom: 132,
+    left: 18,
+    right: 70,
+  },
+  descriptionText: {
+    fontSize: 12.5,
+    lineHeight: 17,
+    color: C.white,
   },
 
   // Author Block

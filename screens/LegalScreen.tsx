@@ -76,7 +76,7 @@ function CguContent() {
         <Para>Vroom SAS ne peut être tenu responsable des contenus publiés par les utilisateurs. Nous nous réservons le droit de supprimer tout contenu contraire aux présentes CGU.</Para>
       </Section>
       <Section title="5. Résiliation">
-        <Para>Vous pouvez supprimer votre compte à tout moment depuis les Paramètres > Compte. La résiliation entraîne la suppression de vos données dans les délais prévus par notre politique de confidentialité.</Para>
+        <Para>Vous pouvez supprimer votre compte à tout moment depuis les Paramètres {'>'} Compte. La résiliation entraîne la suppression de vos données dans les délais prévus par notre politique de confidentialité.</Para>
       </Section>
       <Section title="6. Droit applicable">
         <Para>Les présentes CGU sont soumises au droit français. Tout litige sera soumis aux juridictions compétentes de Paris.</Para>

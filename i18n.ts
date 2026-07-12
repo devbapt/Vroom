@@ -102,6 +102,8 @@ export interface Translations {
     favorites: string;
     repost: string;
     history: string;
+    showMore: string;
+    showLess: string;
     logout: string;
     settings: string;
     activity: string;
@@ -184,6 +186,34 @@ export interface Translations {
     errorMsg: string;
     by: string;
     emptyHint: string;
+    searchAddress: string;
+    addressPlaceholder: string;
+    noResults: string;
+    iAttend: string;
+    cancelAttendance: string;
+    attendeesCount: string;
+    myRoutes: string;
+    recordRoute: string;
+    startRecording: string;
+    stopRecording: string;
+    recordingWarning: string;
+    recordingInProgress: string;
+    saveRoute: string;
+    routeNamePlaceholder: string;
+    publishRoute: string;
+    distanceLabel: string;
+    durationLabel: string;
+    addWaypointHint: string;
+    undoLastPoint: string;
+    clearWaypoints: string;
+    favoriteRoute: string;
+    unfavoriteRoute: string;
+    recordedRoutesTab: string;
+    publishedRoutesTab: string;
+    favoriteRoutesTab: string;
+    noSavedRoutes: string;
+    noPublishedRoutes: string;
+    noFavoriteRoutes: string;
   };
   activity: {
     title: string;
@@ -296,6 +326,8 @@ const FR: Translations = {
     favorites: 'Favoris',
     repost: 'Repost',
     history: 'HISTORIQUE',
+    showMore: 'Voir plus',
+    showLess: 'Voir moins',
     logout: 'Se déconnecter',
     settings: 'Paramètres',
     activity: 'Activité',
@@ -378,6 +410,34 @@ const FR: Translations = {
     errorMsg: 'Impossible de publier ce point.',
     by: 'par',
     emptyHint: 'Aucun point pour l\'instant — sois le premier à en ajouter un !',
+    searchAddress: 'Adresse',
+    addressPlaceholder: 'Rechercher une adresse…',
+    noResults: 'Aucun résultat pour cette adresse.',
+    iAttend: 'Je participe',
+    cancelAttendance: 'Annuler ma participation',
+    attendeesCount: 'participant(s)',
+    myRoutes: 'Mes itinéraires',
+    recordRoute: 'Enregistrer un trajet',
+    startRecording: 'Démarrer',
+    stopRecording: 'Arrêter',
+    recordingWarning: 'Garde l\'application ouverte et l\'écran allumé pendant tout le trajet pour un enregistrement fiable.',
+    recordingInProgress: 'Enregistrement en cours…',
+    saveRoute: 'Enregistrer',
+    routeNamePlaceholder: 'Nom du trajet',
+    publishRoute: 'Publier sur la carte',
+    distanceLabel: 'Distance',
+    durationLabel: 'Durée',
+    addWaypointHint: 'Touche la carte pour ajouter des points, dans l\'ordre du trajet.',
+    undoLastPoint: 'Annuler le dernier point',
+    clearWaypoints: 'Effacer',
+    favoriteRoute: 'Ajouter aux favoris',
+    unfavoriteRoute: 'Retirer des favoris',
+    recordedRoutesTab: 'Enregistrés',
+    publishedRoutesTab: 'Publiés',
+    favoriteRoutesTab: 'Favoris',
+    noSavedRoutes: 'Aucun trajet enregistré pour l\'instant.',
+    noPublishedRoutes: 'Aucun itinéraire publié pour l\'instant.',
+    noFavoriteRoutes: 'Aucun itinéraire en favori pour l\'instant.',
   },
   activity: {
     title: 'Activité',
@@ -490,6 +550,8 @@ const EN: Translations = {
     favorites: 'Favorites',
     repost: 'Repost',
     history: 'HISTORY',
+    showMore: 'Show more',
+    showLess: 'Show less',
     logout: 'Log out',
     settings: 'Settings',
     activity: 'Activity',
@@ -572,6 +634,34 @@ const EN: Translations = {
     errorMsg: 'Unable to publish this point.',
     by: 'by',
     emptyHint: 'No points yet — be the first to add one!',
+    searchAddress: 'Address',
+    addressPlaceholder: 'Search an address…',
+    noResults: 'No results for this address.',
+    iAttend: 'I\'m attending',
+    cancelAttendance: 'Cancel attendance',
+    attendeesCount: 'attendee(s)',
+    myRoutes: 'My routes',
+    recordRoute: 'Record a route',
+    startRecording: 'Start',
+    stopRecording: 'Stop',
+    recordingWarning: 'Keep the app open and your screen on for the whole ride for a reliable recording.',
+    recordingInProgress: 'Recording in progress…',
+    saveRoute: 'Save',
+    routeNamePlaceholder: 'Route name',
+    publishRoute: 'Publish to the map',
+    distanceLabel: 'Distance',
+    durationLabel: 'Duration',
+    addWaypointHint: 'Tap the map to add points, in the order of the route.',
+    undoLastPoint: 'Undo last point',
+    clearWaypoints: 'Clear',
+    favoriteRoute: 'Add to favorites',
+    unfavoriteRoute: 'Remove from favorites',
+    recordedRoutesTab: 'Recorded',
+    publishedRoutesTab: 'Published',
+    favoriteRoutesTab: 'Favorites',
+    noSavedRoutes: 'No recorded route yet.',
+    noPublishedRoutes: 'No published route yet.',
+    noFavoriteRoutes: 'No favorite route yet.',
   },
   activity: {
     title: 'Activity',

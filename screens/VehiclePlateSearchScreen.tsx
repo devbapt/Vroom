@@ -2,7 +2,7 @@ import { useState, useCallback, useRef } from 'react';
 import {
   View, Text, StyleSheet, TextInput, Pressable,
   ActivityIndicator, KeyboardAvoidingView, Platform,
-  Animated, Easing,
+  Animated, Easing, ScrollView,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -169,7 +169,12 @@ export default function VehiclePlateSearchScreen() {
           <View style={{ width: 24 }} />
         </View>
 
-        <View style={styles.content}>
+        <ScrollView
+          contentContainerStyle={styles.content}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+          showsVerticalScrollIndicator={false}
+        >
 
           {/* Hero text */}
           <View style={styles.hero}>
@@ -293,7 +298,7 @@ export default function VehiclePlateSearchScreen() {
               <Text style={styles.manualBtnText}>Saisir manuellement</Text>
             </Pressable>
           )}
-        </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -310,7 +315,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: { fontSize: 15, fontWeight: '700', color: C.white },
 
-  content: { flex: 1, paddingHorizontal: 20, paddingTop: 24 },
+  content: { paddingHorizontal: 20, paddingTop: 24, paddingBottom: 32, flexGrow: 1 },
 
   // Hero
   hero:      { alignItems: 'center', marginBottom: 32, gap: 10 },

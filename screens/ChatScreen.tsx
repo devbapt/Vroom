@@ -13,6 +13,7 @@ import {
   ListRenderItemInfo,
   Animated,
   TouchableOpacity,
+  Keyboard,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -390,7 +391,10 @@ export default function ChatScreen() {
         {loading ? (
           <View style={[styles.loader, { backgroundColor: C.chatBg }]}><ActivityIndicator color={C.accent} /></View>
         ) : (
-          <Pressable style={[styles.flex, { backgroundColor: C.chatBg }]} onPress={closeMenu}>
+          <Pressable
+            style={[styles.flex, { backgroundColor: C.chatBg }]}
+            onPress={() => { closeMenu(); Keyboard.dismiss(); }}
+          >
             <FlatList
               data={messages}
               renderItem={renderItem}
@@ -398,7 +402,7 @@ export default function ChatScreen() {
               inverted
               contentContainerStyle={styles.list}
               showsVerticalScrollIndicator={false}
-              keyboardDismissMode="interactive"
+              keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
               ListEmptyComponent={
                 <View style={styles.emptyChat}>
                   <UserAvatar user={otherUser} size={52} />

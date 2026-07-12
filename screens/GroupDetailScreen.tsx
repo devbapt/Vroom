@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TextInput, Pressable,
   KeyboardAvoidingView, Platform, Alert, ActivityIndicator,
-  ListRenderItemInfo, TouchableOpacity, Modal, ScrollView,
+  ListRenderItemInfo, TouchableOpacity, Modal, ScrollView, Keyboard,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -343,21 +343,23 @@ export default function GroupDetailScreen() {
           {loading ? (
             <View style={[styles.loader, { backgroundColor: C.chatBg }]}><ActivityIndicator color={C.accent} /></View>
           ) : (
-            <FlatList
-              style={{ backgroundColor: C.chatBg }}
-              data={messages}
-              renderItem={renderItem}
-              keyExtractor={(m) => m.id}
-              inverted
-              contentContainerStyle={styles.list}
-              showsVerticalScrollIndicator={false}
-              keyboardDismissMode="interactive"
-              ListEmptyComponent={
-                <View style={styles.emptyChat}>
-                  <Text style={styles.emptyChatHint}>Sois le premier à écrire dans {group?.name ?? groupName} 👋</Text>
-                </View>
-              }
-            />
+            <Pressable style={styles.flex} onPress={Keyboard.dismiss}>
+              <FlatList
+                style={{ backgroundColor: C.chatBg }}
+                data={messages}
+                renderItem={renderItem}
+                keyExtractor={(m) => m.id}
+                inverted
+                contentContainerStyle={styles.list}
+                showsVerticalScrollIndicator={false}
+                keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+                ListEmptyComponent={
+                  <View style={styles.emptyChat}>
+                    <Text style={styles.emptyChatHint}>Sois le premier à écrire dans {group?.name ?? groupName} 👋</Text>
+                  </View>
+                }
+              />
+            </Pressable>
           )}
 
           <View style={styles.inputBar}>

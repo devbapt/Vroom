@@ -15,6 +15,7 @@ import PostDetailScreen          from '../screens/PostDetailScreen';
 import VehiclePlateSearchScreen  from '../screens/VehiclePlateSearchScreen';
 import CertificationScreen       from '../screens/CertificationScreen';
 import UserProfileScreen         from '../screens/UserProfileScreen';
+import RecordRouteScreen         from '../screens/RecordRouteScreen';
 
 const Stack = createStackNavigator();
 
@@ -51,6 +52,7 @@ export default function ProfileStackNavigator() {
       <Stack.Screen name="AddVehicle"      component={AddVehicleScreen}     options={MODAL} />
       <Stack.Screen name="CreateStory"     component={CreateStoryScreen}    options={MODAL} />
       <Stack.Screen name="CreatePost"      component={CreatePostScreen}     options={MODAL} />
+      <Stack.Screen name="RecordRoute"     component={RecordRouteScreen}    options={MODAL} />
     </Stack.Navigator>
   );
 }

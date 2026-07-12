@@ -372,18 +372,21 @@ export default function CommentsSheet({ postId, visible, onClose, onCommentCount
           {loading ? (
             <ActivityIndicator color={C.accent} style={{ marginTop: 32 }} />
           ) : (
-            <FlatList
-              data={flatList}
-              keyExtractor={item => item.id}
-              renderItem={renderItem}
-              style={styles.list}
-              contentContainerStyle={styles.listContent}
-              showsVerticalScrollIndicator={false}
-              keyboardDismissMode="on-drag"
-              ListEmptyComponent={
-                <Text style={styles.emptyText}>Sois le premier à commenter !</Text>
-              }
-            />
+            <Pressable style={styles.list} onPress={Keyboard.dismiss}>
+              <FlatList
+                data={flatList}
+                keyExtractor={item => item.id}
+                renderItem={renderItem}
+                style={styles.list}
+                contentContainerStyle={styles.listContent}
+                showsVerticalScrollIndicator={false}
+                keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+                keyboardShouldPersistTaps="handled"
+                ListEmptyComponent={
+                  <Text style={styles.emptyText}>Sois le premier à commenter !</Text>
+                }
+              />
+            </Pressable>
           )}
 
           {/* Reply indicator */}
@@ -447,7 +450,7 @@ const styles = StyleSheet.create({
     right: 0,
   },
   sheet: {
-    maxHeight: SCREEN_HEIGHT * 0.82,
+    height: SCREEN_HEIGHT * 0.82,
     backgroundColor: C.bg,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,

@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
   View, Text, StyleSheet, Pressable, Alert, Linking,
   ActivityIndicator, Animated, Platform,
@@ -6,7 +6,7 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Image as ExpoImage } from 'expo-image';
-import MapView, { Marker, type Region } from 'react-native-maps';
+import MapView, { Marker, Polyline, type Region } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { supabase } from '../supabaseClient';
@@ -49,6 +49,7 @@ type MapPoint = {
   image_url: string | null;
   event_date: string | null;
   created_at: string;
+  waypoints: { lat: number; lng: number }[] | null;
   profiles: { username: string; avatar_url: string | null } | null;
 };
 
@@ -87,6 +88,13 @@ export default function MapScreen() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<Filter>('all');
   const [selected, setSelected] = useState<MapPoint | null>(null);
+
+  const [attendeeCount, setAttendeeCount] = useState(0);
+  const [isAttending, setIsAttending] = useState(false);
+  const [attendeeLoading, setAttendeeLoading] = useState(false);
+
+  const [isFavorited, setIsFavorited] = useState(false);
+  const [favoriteLoading, setFavoriteLoading] = useState(false);
 
   const cardAnim = useRef(new Animated.Value(0)).current;
 
@@ -138,6 +146,105 @@ export default function MapScreen() {
   }, [selected, cardAnim]);
 
   const closeCard = useCallback(() => setSelected(null), []);
+
+  // ── Participants (événements) ─────────────────────────────────────────────
+  useEffect(() => {
+    if (!selected || selected.type !== 'event') {
+      setAttendeeCount(0);
+      setIsAttending(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const { count } = await supabase
+        .from('map_point_attendees')
+        .select('id', { count: 'exact', head: true })
+        .eq('map_point_id', selected.id);
+      const { data: mine } = user?.id
+        ? await supabase
+            .from('map_point_attendees')
+            .select('id')
+            .eq('map_point_id', selected.id)
+            .eq('user_id', user.id)
+            .maybeSingle()
+        : { data: null };
+      if (!cancelled) {
+        setAttendeeCount(count ?? 0);
+        setIsAttending(!!mine);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [selected, user?.id]);
+
+  const toggleAttendance = useCallback(async () => {
+    if (!selected || !user?.id || attendeeLoading) return;
+    setAttendeeLoading(true);
+    const wasAttending = isAttending;
+    setIsAttending(!wasAttending);
+    setAttendeeCount((c) => Math.max(0, wasAttending ? c - 1 : c + 1));
+
+    if (wasAttending) {
+      const { error } = await supabase
+        .from('map_point_attendees')
+        .delete()
+        .eq('map_point_id', selected.id)
+        .eq('user_id', user.id);
+      if (error) {
+        setIsAttending(true);
+        setAttendeeCount((c) => c + 1);
+      }
+    } else {
+      const { error } = await supabase
+        .from('map_point_attendees')
+        .insert({ map_point_id: selected.id, user_id: user.id });
+      if (error) {
+        setIsAttending(false);
+        setAttendeeCount((c) => Math.max(0, c - 1));
+      }
+    }
+    setAttendeeLoading(false);
+  }, [selected, user?.id, isAttending, attendeeLoading]);
+
+  // ── Favoris (itinéraires) ─────────────────────────────────────────────────
+  useEffect(() => {
+    if (!selected || selected.type !== 'route' || !user?.id) {
+      setIsFavorited(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from('saved_route_favorites')
+        .select('id')
+        .eq('map_point_id', selected.id)
+        .eq('user_id', user.id)
+        .maybeSingle();
+      if (!cancelled) setIsFavorited(!!data);
+    })();
+    return () => { cancelled = true; };
+  }, [selected, user?.id]);
+
+  const toggleFavorite = useCallback(async () => {
+    if (!selected || !user?.id || favoriteLoading) return;
+    setFavoriteLoading(true);
+    const wasFavorited = isFavorited;
+    setIsFavorited(!wasFavorited);
+
+    if (wasFavorited) {
+      const { error } = await supabase
+        .from('saved_route_favorites')
+        .delete()
+        .eq('map_point_id', selected.id)
+        .eq('user_id', user.id);
+      if (error) setIsFavorited(true);
+    } else {
+      const { error } = await supabase
+        .from('saved_route_favorites')
+        .insert({ map_point_id: selected.id, user_id: user.id });
+      if (error) setIsFavorited(false);
+    }
+    setFavoriteLoading(false);
+  }, [selected, user?.id, isFavorited, favoriteLoading]);
 
   // ── Itinéraire externe ────────────────────────────────────────────────────
   const handleGetDirections = useCallback((point: MapPoint) => {
@@ -201,7 +308,18 @@ export default function MapScreen() {
         showsMyLocationButton={false}
       >
         {filteredPoints.map((p) => (
-          <PointMarker key={p.id} point={p} onPress={() => setSelected(p)} />
+          <React.Fragment key={p.id}>
+            <PointMarker point={p} onPress={() => setSelected(p)} />
+            {p.waypoints && p.waypoints.length > 1 && (
+              <Polyline
+                coordinates={p.waypoints.map((w) => ({ latitude: w.lat, longitude: w.lng }))}
+                strokeColor={C.success}
+                strokeWidth={3}
+                tappable
+                onPress={() => setSelected(p)}
+              />
+            )}
+          </React.Fragment>
         ))}
       </MapView>
 
@@ -273,9 +391,20 @@ export default function MapScreen() {
                   <Ionicons name={selected.type === 'event' ? 'calendar' : 'flag'} size={12} color={C.white} />
                   <Text style={styles.typeBadgeText}>{selected.type === 'event' ? t.typeEvent : t.typeRoute}</Text>
                 </View>
-                <Pressable onPress={closeCard} hitSlop={10}>
-                  <Ionicons name="close" size={22} color={C.muted} />
-                </Pressable>
+                <View style={styles.detailHeaderActions}>
+                  {selected.type === 'route' && (
+                    <Pressable onPress={toggleFavorite} disabled={favoriteLoading} hitSlop={10}>
+                      <Ionicons
+                        name={isFavorited ? 'bookmark' : 'bookmark-outline'}
+                        size={20}
+                        color={isFavorited ? C.accent : C.muted}
+                      />
+                    </Pressable>
+                  )}
+                  <Pressable onPress={closeCard} hitSlop={10}>
+                    <Ionicons name="close" size={22} color={C.muted} />
+                  </Pressable>
+                </View>
               </View>
 
               <Text style={styles.detailTitle}>{selected.title}</Text>
@@ -288,6 +417,29 @@ export default function MapScreen() {
                 <View style={styles.detailRow}>
                   <Ionicons name="time-outline" size={14} color={C.muted} />
                   <Text style={styles.detailRowText}>{selected.event_date}</Text>
+                </View>
+              )}
+
+              {selected.type === 'event' && (
+                <View style={styles.attendeeRow}>
+                  <View style={styles.detailRow}>
+                    <Ionicons name="people-outline" size={14} color={C.muted} />
+                    <Text style={styles.detailRowText}>{attendeeCount} {t.attendeesCount}</Text>
+                  </View>
+                  <Pressable
+                    style={[styles.attendBtn, isAttending && styles.attendBtnActive]}
+                    onPress={toggleAttendance}
+                    disabled={attendeeLoading}
+                  >
+                    <Ionicons
+                      name={isAttending ? 'checkmark-circle' : 'add-circle-outline'}
+                      size={15}
+                      color={isAttending ? C.white : C.accent}
+                    />
+                    <Text style={[styles.attendBtnText, isAttending && styles.attendBtnTextActive]}>
+                      {isAttending ? t.cancelAttendance : t.iAttend}
+                    </Text>
+                  </Pressable>
                 </View>
               )}
 
@@ -377,6 +529,7 @@ const styles = StyleSheet.create({
     backgroundColor: C.border, alignSelf: 'center', marginBottom: 14,
   },
   detailHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+  detailHeaderActions: { flexDirection: 'row', alignItems: 'center', gap: 16 },
   typeBadge: {
     flexDirection: 'row', alignItems: 'center', gap: 5,
     paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12,
@@ -386,6 +539,15 @@ const styles = StyleSheet.create({
   detailAuthor: { fontSize: 12, color: C.muted, marginBottom: 10 },
   detailRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
   detailRowText: { fontSize: 13, color: C.whiteSoft },
+  attendeeRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
+  attendBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16,
+    borderWidth: 1, borderColor: C.accent,
+  },
+  attendBtnActive: { backgroundColor: C.accent },
+  attendBtnText: { fontSize: 12, fontWeight: '700', color: C.accent },
+  attendBtnTextActive: { color: C.white },
   detailDescription: { fontSize: 13, color: C.whiteSoft, lineHeight: 19, marginBottom: 12 },
   detailImage: { width: '100%', aspectRatio: 16 / 9, borderRadius: 12, marginBottom: 14, backgroundColor: '#000' },
 
