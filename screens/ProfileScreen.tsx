@@ -12,6 +12,8 @@ import {
   RefreshControl,
   Alert,
   ActivityIndicator,
+  Platform,
+  ActionSheetIOS,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -27,6 +29,7 @@ import { getTranslation } from '../i18n';
 import type { ProfileTag } from '../context/AppContext';
 import StoryViewer from './StoryViewer';
 import ExpandableText from '../components/ui/ExpandableText';
+import AppText from '../components/ui/AppText';
 
 const { width } = Dimensions.get('window');
 
@@ -90,10 +93,16 @@ export default function ProfileScreen() {
   const [addSheetVisible, setAddSheetVisible] = useState(false);
   const [slideAnim] = useState(new Animated.Value(600));
   const [addSlideAnim] = useState(new Animated.Value(600));
+  const [menuOverlayAnim] = useState(new Animated.Value(0));
+  const [addOverlayAnim] = useState(new Animated.Value(0));
   const [refreshing, setRefreshing] = useState(false);
   const [myPublications, setMyPublications] = useState<any[]>([]);
   const [garageItems, setGarageItems] = useState<GarageCar[]>([]);
   const [highlightViewerId, setHighlightViewerId] = useState<string | null>(null);
+  const [myStoryViewerOpen, setMyStoryViewerOpen] = useState(false);
+  const [avatarSheetVisible, setAvatarSheetVisible] = useState(false);
+  const [avatarSheetAnim] = useState(new Animated.Value(600));
+  const [avatarOverlayAnim] = useState(new Animated.Value(0));
   const [eventsCount, setEventsCount] = useState(0);
   const [groupsCount, setGroupsCount] = useState(0);
   const [trackdaysCount, setTrackdaysCount] = useState(0);
@@ -181,6 +190,10 @@ export default function ProfileScreen() {
   const highlightStories = feedStories
     .filter((s) => s.highlightId === highlightViewerId)
     .map((s) => ({ id: s.id, image: s.imageUrl, userId: s.userId }));
+  const myOwnStories = feedStories
+    .filter((s) => s.userId === user?.id && !s.highlightId)
+    .map((s) => ({ id: s.id, image: s.imageUrl, userId: s.userId }));
+  const hasActiveStory = myOwnStories.length > 0;
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -191,20 +204,41 @@ export default function ProfileScreen() {
     setRefreshing(false);
   }, [fetchPublications, fetchGarage, fetchStats, fetchRoutes, activeTab]);
 
+  const SHEET_SPRING = { useNativeDriver: true, damping: 22, stiffness: 220, mass: 0.9 };
+
   const openMenu = () => {
     setMenuVisible(true);
-    Animated.spring(slideAnim, { toValue: 0, useNativeDriver: true }).start();
+    Animated.parallel([
+      Animated.spring(slideAnim, { toValue: 0, ...SHEET_SPRING }),
+      Animated.timing(menuOverlayAnim, { toValue: 1, duration: 220, useNativeDriver: true }),
+    ]).start();
   };
   const closeMenu = () => {
-    Animated.timing(slideAnim, { toValue: 600, duration: 280, useNativeDriver: true }).start(() => setMenuVisible(false));
+    Animated.parallel([
+      Animated.timing(slideAnim, { toValue: 600, duration: 240, useNativeDriver: true }),
+      Animated.timing(menuOverlayAnim, { toValue: 0, duration: 200, useNativeDriver: true }),
+    ]).start(() => setMenuVisible(false));
   };
 
   const openAddSheet = () => {
     setAddSheetVisible(true);
-    Animated.spring(addSlideAnim, { toValue: 0, useNativeDriver: true }).start();
+    Animated.parallel([
+      Animated.spring(addSlideAnim, { toValue: 0, ...SHEET_SPRING }),
+      Animated.timing(addOverlayAnim, { toValue: 1, duration: 220, useNativeDriver: true }),
+    ]).start();
   };
   const closeAddSheet = () => {
-    Animated.timing(addSlideAnim, { toValue: 600, duration: 260, useNativeDriver: true }).start(() => setAddSheetVisible(false));
+    Animated.parallel([
+      Animated.timing(addSlideAnim, { toValue: 600, duration: 240, useNativeDriver: true }),
+      Animated.timing(addOverlayAnim, { toValue: 0, duration: 200, useNativeDriver: true }),
+    ]).start(() => setAddSheetVisible(false));
+  };
+
+  const closeAvatarSheet = () => {
+    Animated.parallel([
+      Animated.timing(avatarSheetAnim, { toValue: 600, duration: 240, useNativeDriver: true }),
+      Animated.timing(avatarOverlayAnim, { toValue: 0, duration: 200, useNativeDriver: true }),
+    ]).start(() => setAvatarSheetVisible(false));
   };
 
   const pickAvatar = useCallback(async () => {
@@ -232,6 +266,34 @@ export default function ProfileScreen() {
       setPendingAvatarBase64(b64);
     }
   }, []);
+
+  const openAvatarMenu = useCallback(() => {
+    const options = [
+      ...(hasActiveStory ? ['Voir ma story'] : []),
+      'Ajouter une story',
+      'Modifier la photo de profil',
+      'Annuler',
+    ];
+    const cancelButtonIndex = options.length - 1;
+
+    if (Platform.OS === 'ios') {
+      ActionSheetIOS.showActionSheetWithOptions(
+        { options, cancelButtonIndex, userInterfaceStyle: 'dark' },
+        (buttonIndex) => {
+          const selected = options[buttonIndex];
+          if (selected === 'Voir ma story') setMyStoryViewerOpen(true);
+          else if (selected === 'Ajouter une story') navigation.navigate('CreateStory');
+          else if (selected === 'Modifier la photo de profil') pickAvatar();
+        }
+      );
+    } else {
+      setAvatarSheetVisible(true);
+      Animated.parallel([
+        Animated.spring(avatarSheetAnim, { toValue: 0, ...SHEET_SPRING }),
+        Animated.timing(avatarOverlayAnim, { toValue: 1, duration: 220, useNativeDriver: true }),
+      ]).start();
+    }
+  }, [hasActiveStory, navigation, pickAvatar]);
 
   const confirmAvatar = useCallback(async () => {
     if (!pendingAvatarBase64 || !user?.id) return;
@@ -313,7 +375,7 @@ export default function ProfileScreen() {
           trackdaysCount={trackdaysCount}
           pendingAvatarUri={pendingAvatarUri}
           isUploadingAvatar={isUploadingAvatar}
-          onPickAvatar={pickAvatar}
+          onOpenAvatarMenu={openAvatarMenu}
           onConfirmAvatar={confirmAvatar}
           onCancelAvatar={() => { setPendingAvatarUri(null); setPendingAvatarBase64(null); }}
           onDeletePost={handleDeletePost}
@@ -321,15 +383,19 @@ export default function ProfileScreen() {
       )}
 
       <StoryViewer
-        visible={!!highlightViewerId}
+        visible={!!highlightViewerId || myStoryViewerOpen}
         highlightId={highlightViewerId ?? ''}
-        onClose={() => setHighlightViewerId(null)}
-        stories={highlightStories}
+        onClose={() => { setHighlightViewerId(null); setMyStoryViewerOpen(false); }}
+        stories={myStoryViewerOpen ? myOwnStories : highlightStories}
         currentUserId={user?.id}
       />
 
       {/* Menu overlay */}
-      {menuVisible && <Pressable style={styles.overlay} onPress={closeMenu} />}
+      {menuVisible && (
+        <Animated.View style={[styles.overlay, { opacity: menuOverlayAnim }]}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={closeMenu} />
+        </Animated.View>
+      )}
       <Animated.View
         style={[styles.bottomSheet, { transform: [{ translateY: slideAnim }] }]}
         pointerEvents={menuVisible ? 'box-none' : 'none'}
@@ -339,44 +405,48 @@ export default function ProfileScreen() {
           <Pressable style={({ pressed }) => [styles.sheetItem, pressed && { backgroundColor: C.bgElevated }]}
             onPress={() => { closeMenu(); navigation.navigate('Settings'); }}>
             <Ionicons name="settings-outline" size={20} color={C.whiteSoft} />
-            <Text style={styles.sheetItemText}>{t.profile.settings}</Text>
+            <AppText weight="medium" style={styles.sheetItemText}>{t.profile.settings}</AppText>
           </Pressable>
           <Pressable style={({ pressed }) => [styles.sheetItem, pressed && { backgroundColor: C.bgElevated }]}
             onPress={() => { closeMenu(); navigation.navigate('Activity'); }}>
             <Ionicons name="notifications-outline" size={20} color={C.whiteSoft} />
-            <Text style={styles.sheetItemText}>{t.profile.activity}</Text>
+            <AppText weight="medium" style={styles.sheetItemText}>{t.profile.activity}</AppText>
           </Pressable>
           <Pressable style={({ pressed }) => [styles.sheetItem, pressed && { backgroundColor: C.bgElevated }]}
             onPress={() => { closeMenu(); navigation.navigate('Saved'); }}>
             <Ionicons name="bookmark-outline" size={20} color={C.whiteSoft} />
-            <Text style={styles.sheetItemText}>{t.profile.saved}</Text>
+            <AppText weight="medium" style={styles.sheetItemText}>{t.profile.saved}</AppText>
           </Pressable>
           <View style={styles.sheetDivider} />
           <Pressable style={({ pressed }) => [styles.sheetItem, pressed && { backgroundColor: 'rgba(229,9,20,0.12)' }]}
             onPress={handleLogout}>
             <Ionicons name="log-out-outline" size={20} color={C.accent} />
-            <Text style={[styles.sheetItemText, { color: C.accent }]}>{t.profile.logout}</Text>
+            <AppText weight="medium" style={[styles.sheetItemText, { color: C.accent }]}>{t.profile.logout}</AppText>
           </Pressable>
         </View>
       </Animated.View>
 
       {/* Add content overlay */}
-      {addSheetVisible && <Pressable style={styles.overlay} onPress={closeAddSheet} />}
+      {addSheetVisible && (
+        <Animated.View style={[styles.overlay, { opacity: addOverlayAnim }]}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={closeAddSheet} />
+        </Animated.View>
+      )}
       <Animated.View
         style={[styles.bottomSheet, { transform: [{ translateY: addSlideAnim }] }]}
         pointerEvents={addSheetVisible ? 'box-none' : 'none'}
       >
         <View style={[styles.sheetInner, { paddingBottom: insets.bottom + 12 }]}>
           <View style={styles.dragHandle} />
-          <Text style={styles.sheetTitle}>Ajouter du contenu</Text>
+          <AppText weight="bold" style={styles.sheetTitle}>Ajouter du contenu</AppText>
           <Pressable style={({ pressed }) => [styles.sheetItem, pressed && { backgroundColor: C.bgElevated }]}
             onPress={() => { closeAddSheet(); navigation.navigate('VehiclePlateSearch'); }}>
             <View style={[styles.sheetIcon, { backgroundColor: '#2A0A0A' }]}>
               <Ionicons name="car-sport-outline" size={18} color={C.white} />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.sheetItemText}>Ajouter au garage</Text>
-              <Text style={styles.sheetItemHint}>Ajouter un véhicule à votre collection</Text>
+              <AppText weight="medium" style={styles.sheetItemText}>Ajouter au garage</AppText>
+              <AppText weight="regular" style={styles.sheetItemHint}>Ajouter un véhicule à votre collection</AppText>
             </View>
           </Pressable>
           <Pressable style={({ pressed }) => [styles.sheetItem, pressed && { backgroundColor: C.bgElevated }]}
@@ -385,8 +455,8 @@ export default function ProfileScreen() {
               <Ionicons name="grid-outline" size={18} color={C.white} />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.sheetItemText}>Nouvelle publication</Text>
-              <Text style={styles.sheetItemHint}>Partager une photo avec vos abonnés</Text>
+              <AppText weight="medium" style={styles.sheetItemText}>Nouvelle publication</AppText>
+              <AppText weight="regular" style={styles.sheetItemHint}>Partager une photo avec vos abonnés</AppText>
             </View>
           </Pressable>
           <Pressable style={({ pressed }) => [styles.sheetItem, pressed && { backgroundColor: C.bgElevated }]}
@@ -395,12 +465,53 @@ export default function ProfileScreen() {
               <Ionicons name="camera-outline" size={18} color={C.white} />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.sheetItemText}>Nouvelle story / highlight</Text>
-              <Text style={styles.sheetItemHint}>Ajouter une photo à la une</Text>
+              <AppText weight="medium" style={styles.sheetItemText}>Nouvelle story / highlight</AppText>
+              <AppText weight="regular" style={styles.sheetItemHint}>Ajouter une photo à la une</AppText>
             </View>
           </Pressable>
         </View>
       </Animated.View>
+
+      {/* Avatar menu — fallback Android (iOS utilise ActionSheetIOS natif) */}
+      {Platform.OS === 'android' && (
+        <>
+          {avatarSheetVisible && (
+            <Animated.View style={[styles.overlay, { opacity: avatarOverlayAnim }]}>
+              <Pressable style={StyleSheet.absoluteFill} onPress={closeAvatarSheet} />
+            </Animated.View>
+          )}
+          <Animated.View
+            style={[styles.bottomSheet, { transform: [{ translateY: avatarSheetAnim }] }]}
+            pointerEvents={avatarSheetVisible ? 'box-none' : 'none'}
+          >
+            <View style={[styles.sheetInner, { paddingBottom: insets.bottom + 12 }]}>
+              <View style={styles.dragHandle} />
+              {hasActiveStory && (
+                <Pressable style={({ pressed }) => [styles.sheetItem, pressed && { backgroundColor: C.bgElevated }]}
+                  onPress={() => { closeAvatarSheet(); setMyStoryViewerOpen(true); }}>
+                  <Ionicons name="play-circle-outline" size={20} color={C.whiteSoft} />
+                  <AppText weight="medium" style={styles.sheetItemText}>Voir ma story</AppText>
+                </Pressable>
+              )}
+              <Pressable style={({ pressed }) => [styles.sheetItem, pressed && { backgroundColor: C.bgElevated }]}
+                onPress={() => { closeAvatarSheet(); navigation.navigate('CreateStory'); }}>
+                <Ionicons name="add-circle-outline" size={20} color={C.whiteSoft} />
+                <AppText weight="medium" style={styles.sheetItemText}>Ajouter une story</AppText>
+              </Pressable>
+              <Pressable style={({ pressed }) => [styles.sheetItem, pressed && { backgroundColor: C.bgElevated }]}
+                onPress={() => { closeAvatarSheet(); pickAvatar(); }}>
+                <Ionicons name="image-outline" size={20} color={C.whiteSoft} />
+                <AppText weight="medium" style={styles.sheetItemText}>Modifier la photo de profil</AppText>
+              </Pressable>
+              <View style={styles.sheetDivider} />
+              <Pressable style={({ pressed }) => [styles.sheetItem, pressed && { backgroundColor: C.bgElevated }]}
+                onPress={closeAvatarSheet}>
+                <AppText weight="medium" style={styles.sheetItemText}>Annuler</AppText>
+              </Pressable>
+            </View>
+          </Animated.View>
+        </>
+      )}
     </View>
   );
 }
@@ -428,7 +539,7 @@ function ProfileGridView({
   insets, activeTab, onTabChange, onCarPress, onOpenMenu, onOpenAddSheet,
   onNavigate, onShareProfile, onRefresh, refreshing, highlights, onOpenHighlight, language,
   user, posts, profileTags, garageItems, pendingAvatarUri, isUploadingAvatar,
-  onPickAvatar, onConfirmAvatar, onCancelAvatar, onDeletePost,
+  onOpenAvatarMenu, onConfirmAvatar, onCancelAvatar, onDeletePost,
   eventsCount, groupsCount, trackdaysCount,
   routesSubTab, onRoutesSubTabChange, savedRoutes, publishedRoutes, favoriteRoutes, routesLoading,
 }: {
@@ -454,7 +565,7 @@ function ProfileGridView({
   trackdaysCount: number;
   pendingAvatarUri: string | null;
   isUploadingAvatar: boolean;
-  onPickAvatar: () => void;
+  onOpenAvatarMenu: () => void;
   onConfirmAvatar: () => void;
   onCancelAvatar: () => void;
   onDeletePost: (postId: string) => void;
@@ -486,7 +597,7 @@ function ProfileGridView({
         {/* Header */}
         <View style={styles.header}>
           <View style={{ width: 28 }} />
-          <Text style={styles.headerTitle}>@{username}</Text>
+          <AppText weight="bold" style={styles.headerTitle}>@{username}</AppText>
           <TouchableOpacity onPress={onOpenMenu} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
             <Ionicons name="menu" size={22} color={C.white} />
           </TouchableOpacity>
@@ -512,7 +623,7 @@ function ProfileGridView({
         {/* Profile row */}
         <View style={styles.profileRow}>
           <View style={styles.avatarContainer}>
-            <TouchableOpacity onPress={onPickAvatar}>
+            <TouchableOpacity onPress={onOpenAvatarMenu}>
               <View style={styles.avatarRing}>
                 {avatarUri ? (
                   <ExpoImage source={avatarUri} style={styles.avatarImage} contentFit="cover"
@@ -644,12 +755,12 @@ function ProfileGridView({
                   </View>
 
                   <View style={styles.garageCardBody}>
-                    <Text style={styles.garageCardTitle} numberOfLines={1}>{car.name}</Text>
-                    <Text style={styles.garageCardSubtitle}>{car.year}</Text>
+                    <AppText weight="bold" style={styles.garageCardTitle} numberOfLines={1}>{car.name}</AppText>
+                    <AppText weight="regular" style={styles.garageCardSubtitle}>{car.year}</AppText>
                     {car.history.length > 0 && (
                       <ExpandableText
                         text={car.history}
-                        numberOfLines={2}
+                        numberOfLines={1}
                         style={styles.garageCardNotes}
                         expandLabel={t.profile.showMore ?? 'Voir plus'}
                         collapseLabel={t.profile.showLess ?? 'Voir moins'}
@@ -854,30 +965,66 @@ function CarDetailView({
   insets: ReturnType<typeof useSafeAreaInsets>;
   language: any;
 }) {
+  const navigation = useNavigation<any>();
   const [isFavorite, setIsFavorite] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [heroRatio, setHeroRatio] = useState(4 / 5);
   const t = getTranslation(language);
   const images = car.images.length > 0 ? car.images : [car.image];
+  const handleShare = () => Share.share({ message: `${car.name} (${car.year})` }).catch(() => {});
+  const heroHeight = width / heroRatio;
+
+  // Description technique : la voiture ne vaut pas être réduite à des cases de fiche produit —
+  // moteur et boîte se lisent comme une phrase, pas comme un tableau de vente.
+  const techLine = [car.year, car.body, car.specs.motor, car.specs.gearbox]
+    .filter((v) => v && v !== '—')
+    .join(' · ');
 
   return (
     <View style={styles.detailRoot}>
-      {/* Image slider */}
-      <View style={styles.detailImageSection}>
+      {/* Hero — même traitement que la vue détaillée des publications : ratio réel, pas de recadrage forcé */}
+      <View style={[styles.detailHero, { height: heroHeight }]}>
         <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false}
           scrollEventThrottle={16}
           onMomentumScrollEnd={(e) =>
             setCurrentImageIndex(Math.round(e.nativeEvent.contentOffset.x / width))
           }>
           {images.map((img, idx) => (
-            <View key={idx} style={{ width, height: 300 }}>
+            <View key={idx} style={{ width, height: heroHeight }}>
               <ExpoImage source={img} style={StyleSheet.absoluteFillObject} contentFit="cover"
-                placeholder={FALLBACK} cachePolicy="memory-disk" />
+                placeholder={FALLBACK} cachePolicy="memory-disk"
+                onLoad={idx === 0 ? (e) => {
+                  const { width: w, height: h } = e.source;
+                  if (w && h) setHeroRatio(Math.min(Math.max(w / h, 0.66), 1.5));
+                } : undefined}
+              />
             </View>
           ))}
         </ScrollView>
+
         <View style={[styles.detailTopBar, { top: insets.top + 10 }]}>
-          <Text style={styles.imageCounter}>{currentImageIndex + 1} / {images.length}</Text>
+          <Pressable style={styles.detailGlassBtn} onPress={onBack} hitSlop={10}>
+            <Ionicons name="chevron-back" size={18} color={C.white} />
+          </Pressable>
+          <View style={styles.detailTopRight}>
+            {images.length > 1 && (
+              <View style={styles.detailCounterPill}>
+                <AppText weight="semibold" style={styles.detailCounterText}>{currentImageIndex + 1} / {images.length}</AppText>
+              </View>
+            )}
+            <Pressable style={styles.detailGlassBtn} onPress={handleShare} hitSlop={10}>
+              <Feather name="share" size={15} color={C.white} />
+            </Pressable>
+          </View>
         </View>
+
+        {car.estCertifie && (
+          <View style={styles.detailSeal}>
+            <Ionicons name="shield-checkmark" size={13} color={C.accent} />
+            <AppText weight="bold" style={styles.detailSealText}>Certifié</AppText>
+          </View>
+        )}
+
         {images.length > 1 && (
           <View style={styles.dotRow}>
             {images.map((_, i) => (
@@ -887,52 +1034,57 @@ function CarDetailView({
         )}
       </View>
 
-      {/* Dark sheet */}
+      {/* Cluster d'instruments — juste l'essentiel, lecture façon tableau de bord */}
+      <View style={styles.instrumentCluster}>
+        <ClusterCell value={car.specs.km} label="Km" />
+        <View style={styles.clusterDivider} />
+        <ClusterCell value={car.power || '—'} label="Ch" />
+      </View>
+
+      {/* Fiche */}
       <ScrollView style={styles.detailSheet}
-        contentContainerStyle={[styles.detailSheetContent, { paddingBottom: 40 }]}
+        contentContainerStyle={[styles.detailSheetContent, { paddingBottom: insets.bottom + 24 }]}
         showsVerticalScrollIndicator={false}>
-        <View style={styles.detailBackRowContainer}>
-          <TouchableOpacity style={styles.detailBackRow} onPress={onBack}>
-            <Ionicons name="chevron-back" size={16} color={C.muted} />
-            <Text style={styles.detailBackText}>{t.profile.back_to_garage}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.detailShareBtn}
-            onPress={() => Share.share({ message: `${car.name} (${car.year})` }).catch(() => {})}>
-            <Feather name="share" size={16} color={C.whiteSoft} />
-          </TouchableOpacity>
-        </View>
 
-        <Text style={styles.detailTitle} numberOfLines={2}>{car.name}</Text>
-        <Text style={styles.detailSubtitle}>{car.year} · {car.body} · {car.power}</Text>
-
-        <View style={styles.specsGrid}>
-          <SpecCard value={car.specs.km} label={t.profile.kilometer} />
-          <SpecCard value={car.specs.motor} label={t.profile.motorization} />
-          <SpecCard value={car.specs.color} label={t.profile.color} />
-          <SpecCard value={car.specs.gearbox} label={t.profile.transmission} />
+        <View style={styles.detailIdentityRow}>
+          <AppText weight="extrabold" style={styles.detailTitle} numberOfLines={2}>{car.name}</AppText>
+          <View style={styles.detailSubRow}>
+            <Text style={styles.detailSubtitle}>{techLine}</Text>
+            {car.specs.color && car.specs.color !== '—' && (
+              <View style={styles.colorPill}>
+                <AppText weight="semibold" style={styles.colorPillText}>{car.specs.color}</AppText>
+              </View>
+            )}
+          </View>
         </View>
 
         <View style={styles.detailActionsRow}>
-          <TouchableOpacity style={[styles.detailActionBtn, isFavorite && styles.detailActionBtnFav]}
+          <Pressable style={[styles.detailPillBtn, isFavorite && styles.detailPillBtnActive]}
             onPress={() => setIsFavorite((v) => !v)}>
-            <Ionicons name={isFavorite ? 'heart' : 'heart-outline'} size={14}
+            <Ionicons name={isFavorite ? 'heart' : 'heart-outline'} size={15}
               color={isFavorite ? C.accent : C.whiteSoft} />
-            <Text style={[styles.detailActionText, isFavorite && { color: C.accent }]}>{t.profile.favorites}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.detailActionBtn}
-            onPress={() => Share.share({ message: `${car.name} (${car.year})` }).catch(() => {})}>
-            <Feather name="corner-up-right" size={13} color={C.whiteSoft} />
-            <Text style={styles.detailActionText}>{t.profile.repost}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.detailActionBtn, { flex: 0, paddingHorizontal: 16 }]}>
-            <Text style={styles.detailActionText}>•••</Text>
-          </TouchableOpacity>
+            <AppText weight="semibold" style={[styles.detailPillText, isFavorite && { color: C.accent }]}>{t.profile.favorites}</AppText>
+          </Pressable>
+          <Pressable style={styles.detailPillBtn} onPress={handleShare}>
+            <Feather name="corner-up-right" size={14} color={C.whiteSoft} />
+            <AppText weight="semibold" style={styles.detailPillText}>{t.profile.repost}</AppText>
+          </Pressable>
+          {!car.estCertifie && (
+            <Pressable style={[styles.detailPillBtn, styles.detailPillBtnCertify]}
+              onPress={() => navigation.navigate('Certification', { vehiculeId: car.id, vehiculeName: car.name })}>
+              <Ionicons name="shield-outline" size={14} color={C.white} />
+              <AppText weight="semibold" style={[styles.detailPillText, { color: C.white }]}>Certifier</AppText>
+            </Pressable>
+          )}
         </View>
 
         {car.history.length > 0 && (
-          <View style={styles.histSection}>
-            <Text style={styles.histLabel}>{t.profile.history}</Text>
-            <Text style={styles.histText}>{car.history}</Text>
+          <View style={styles.logbookSection}>
+            <AppText weight="bold" style={styles.logbookLabel}>Carnet de bord</AppText>
+            <View style={styles.logbookCard}>
+              <View style={styles.logbookDot} />
+              <Text style={styles.logbookText}>{car.history}</Text>
+            </View>
           </View>
         )}
       </ScrollView>
@@ -949,11 +1101,11 @@ function StatColumn({ value, label }: { value: string; label: string }) {
   );
 }
 
-function SpecCard({ value, label }: { value: string; label: string }) {
+function ClusterCell({ value, label }: { value: string; label: string }) {
   return (
-    <View style={styles.specCard}>
-      <Text style={styles.specValue}>{value}</Text>
-      <Text style={styles.specLabel}>{label}</Text>
+    <View style={styles.clusterCell}>
+      <AppText weight="bold" style={styles.clusterValue} numberOfLines={1}>{value}</AppText>
+      <Text style={styles.clusterLabel}>{label}</Text>
     </View>
   );
 }
@@ -970,7 +1122,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: PAD, paddingVertical: 10,
   },
-  headerTitle: { fontSize: 13, fontWeight: '700', color: C.white },
+  headerTitle: { fontSize: 17, color: C.white },
 
   profileRow: {
     flexDirection: 'row', alignItems: 'center',
@@ -1029,12 +1181,12 @@ const styles = StyleSheet.create({
   activityValue: { fontSize: 20, fontWeight: '800', color: C.white, marginBottom: 1 },
   activityLabel: { fontSize: 8, color: C.whiteSoft, fontWeight: '500', textAlign: 'center', letterSpacing: 0.2 },
 
-  highlightsSection: { marginBottom: 4 },
+  highlightsSection: { marginBottom: 0 },
   highlightsLabel: {
     fontSize: 10, fontWeight: '700', color: C.muted,
-    paddingHorizontal: PAD, letterSpacing: 0.6, marginBottom: 10, textTransform: 'uppercase',
+    paddingHorizontal: PAD, letterSpacing: 0.6, marginBottom: 8, textTransform: 'uppercase',
   },
-  highlightsScroll: { paddingHorizontal: PAD - 2, gap: 8, paddingBottom: 4 },
+  highlightsScroll: { paddingHorizontal: PAD - 2, gap: 8, paddingBottom: 0 },
   highlightItem:   { alignItems: 'center', width: 64 },
   highlightBubble: {
     width: 60, height: 60, borderRadius: 30,
@@ -1045,7 +1197,8 @@ const styles = StyleSheet.create({
   highlightImage: { width: '100%', height: '100%' },
   highlightLabel: { fontSize: 9, color: C.whiteSoft, fontWeight: '500', textAlign: 'center' },
 
-  tabsRow: { flexDirection: 'row', marginTop: 16, borderBottomWidth: 0.5, borderBottomColor: C.border },
+  // Onglets remontés — moins d'espace mort avant le contenu (Publications) qu'on veut voir sans scroller
+  tabsRow: { flexDirection: 'row', marginTop: 6, borderBottomWidth: 0.5, borderBottomColor: C.border },
   tabItem: {
     flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     paddingVertical: 10, gap: 4, borderBottomWidth: 2, borderBottomColor: 'transparent',
@@ -1067,12 +1220,12 @@ const styles = StyleSheet.create({
     borderWidth: 0.5,
     borderColor: C.border,
   },
-  garageCardImageWrap: { width: '100%', aspectRatio: 16 / 9 },
+  garageCardImageWrap: { width: '100%', aspectRatio: 4 / 3 },
   garageCardImage: { width: '100%', height: '100%' },
-  garageCardBody: { padding: 12, gap: 3 },
-  garageCardTitle: { color: C.white, fontSize: 14, fontWeight: '700' },
-  garageCardSubtitle: { color: C.whiteSoft, fontSize: 11, marginBottom: 4 },
-  garageCardNotes: { color: C.whiteSoft, fontSize: 12, lineHeight: 17 },
+  garageCardBody: { paddingHorizontal: 12, paddingTop: 8, paddingBottom: 10, gap: 2 },
+  garageCardTitle: { color: C.white, fontSize: 14 },
+  garageCardSubtitle: { color: C.whiteSoft, fontSize: 11, marginBottom: 2 },
+  garageCardNotes: { color: C.whiteSoft, fontSize: 12, lineHeight: 16 },
 
   card: {
     width: CARD_WIDTH,
@@ -1151,53 +1304,90 @@ const styles = StyleSheet.create({
   routeCardStat: { fontSize: 12, color: C.whiteSoft },
   routeCardDesc: { fontSize: 12, color: C.whiteSoft, lineHeight: 17 },
 
-  // Car Detail
+  // Car Detail — hero immersif + cluster d'instruments + carnet de bord
   detailRoot: { flex: 1, backgroundColor: C.bg },
-  detailImageSection: { height: 300, position: 'relative' },
+  detailHero: { position: 'relative', backgroundColor: C.bgCard },
   detailTopBar: {
-    position: 'absolute', right: PAD, left: PAD,
-    flexDirection: 'row', justifyContent: 'flex-end',
+    position: 'absolute', left: PAD, right: PAD,
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
   },
-  imageCounter: {
-    fontSize: 11, fontWeight: '600', color: 'rgba(255,255,255,0.9)',
-    backgroundColor: 'rgba(0,0,0,0.35)', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6,
+  detailTopRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  detailGlassBtn: {
+    width: 34, height: 34, borderRadius: 17,
+    backgroundColor: 'rgba(10,4,4,0.5)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)',
+    justifyContent: 'center', alignItems: 'center',
   },
+  detailCounterPill: {
+    paddingHorizontal: 9, paddingVertical: 6, borderRadius: 20,
+    backgroundColor: 'rgba(10,4,4,0.5)',
+    borderWidth: 1, borderColor: 'rgba(255,255,255,0.14)',
+  },
+  detailCounterText: { fontSize: 10, color: 'rgba(255,255,255,0.9)' },
+  detailSeal: {
+    position: 'absolute', left: PAD, bottom: 18,
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    paddingVertical: 6, paddingHorizontal: 11, borderRadius: 20,
+    backgroundColor: 'rgba(10,4,4,0.55)',
+    borderWidth: 1, borderColor: 'rgba(229,9,20,0.5)',
+  },
+  detailSealText: { fontSize: 10, color: C.accent, letterSpacing: 0.5, textTransform: 'uppercase' },
   dotRow: {
     position: 'absolute', bottom: 10, left: 0, right: 0,
     flexDirection: 'row', justifyContent: 'center', gap: 5,
   },
   dot:       { width: 5, height: 5, borderRadius: 2.5, backgroundColor: 'rgba(255,255,255,0.4)' },
   dotActive: { backgroundColor: C.white, width: 14 },
-  detailSheet: {
-    flex: 1, backgroundColor: C.bgCard,
-    borderTopLeftRadius: 20, borderTopRightRadius: 20, marginTop: -20,
+
+  instrumentCluster: {
+    flexDirection: 'row',
+    marginHorizontal: PAD,
+    marginTop: -22,
+    backgroundColor: C.bgCard,
+    borderRadius: 16,
+    borderWidth: 0.5, borderColor: C.border,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.35, shadowRadius: 12, elevation: 10,
   },
-  detailSheetContent: { padding: PAD, paddingTop: 12 },
-  detailBackRowContainer: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10,
+  clusterCell: { flex: 1, alignItems: 'center', paddingVertical: 12 },
+  clusterDivider: { width: StyleSheet.hairlineWidth, backgroundColor: C.border, marginVertical: 10 },
+  clusterValue: { fontSize: 13, color: C.white },
+  clusterLabel: { fontSize: 8.5, color: C.muted, marginTop: 3, textTransform: 'uppercase', letterSpacing: 0.5 },
+
+  detailSheet: { flex: 1, backgroundColor: C.bg },
+  detailSheetContent: { padding: PAD, paddingTop: 18 },
+  detailIdentityRow: { marginBottom: 16 },
+  detailTitle: { fontSize: 21, color: C.white, lineHeight: 26, marginBottom: 6 },
+  detailSubRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
+  detailSubtitle: { fontSize: 12, color: C.muted },
+  colorPill: {
+    paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10,
+    backgroundColor: C.bgElevated, borderWidth: 0.5, borderColor: C.border,
   },
-  detailBackRow: { flexDirection: 'row', alignItems: 'center', gap: 2 },
-  detailBackText: { fontSize: 11, color: C.muted, fontWeight: '500' },
-  detailShareBtn: {
-    width: 34, height: 34, borderRadius: 17, backgroundColor: C.bgElevated,
-    justifyContent: 'center', alignItems: 'center',
+  colorPillText: { fontSize: 10, color: C.whiteSoft },
+
+  detailActionsRow: { flexDirection: 'row', gap: 8, marginBottom: 22 },
+  detailPillBtn: {
+    flex: 1, height: 38, borderRadius: 11, borderWidth: 1, borderColor: C.border,
+    backgroundColor: C.bgElevated,
+    flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6,
   },
-  detailTitle:    { fontSize: 19, fontWeight: '800', color: C.white, lineHeight: 24, marginBottom: 4 },
-  detailSubtitle: { fontSize: 11, color: C.muted, marginBottom: 14 },
-  specsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
-  specCard:  { width: '48%', backgroundColor: C.bgElevated, borderRadius: 10, padding: 12 },
-  specValue: { fontSize: 14, fontWeight: '700', color: C.white, marginBottom: 2 },
-  specLabel: { fontSize: 9, color: C.muted },
-  detailActionsRow: { flexDirection: 'row', gap: 8, marginBottom: 18 },
-  detailActionBtn: {
-    flex: 1, height: 36, borderRadius: 10, borderWidth: 1, borderColor: C.border,
-    flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 5,
+  detailPillBtnActive: { borderColor: C.accent, backgroundColor: 'rgba(229,9,20,0.1)' },
+  // CTA plein (pas juste teinté) pour se distinguer du bouton Favori et donner du poids à l'action
+  detailPillBtnCertify: { borderColor: C.accent, backgroundColor: C.accent },
+  detailPillText: { fontSize: 11.5, color: C.whiteSoft },
+
+  logbookSection: {},
+  logbookLabel: {
+    fontSize: 10, color: C.accent, letterSpacing: 1,
+    textTransform: 'uppercase', marginBottom: 10,
   },
-  detailActionBtnFav: { borderColor: C.accent, backgroundColor: 'rgba(229,9,20,0.1)' },
-  detailActionText: { fontSize: 11, fontWeight: '600', color: C.whiteSoft },
-  histSection: { backgroundColor: C.bgElevated, borderRadius: 12, padding: 14 },
-  histLabel:   { fontSize: 9, fontWeight: '700', color: C.accent, letterSpacing: 0.8, marginBottom: 7 },
-  histText:    { fontSize: 12, color: C.whiteSoft, lineHeight: 18 },
+  logbookCard: {
+    flexDirection: 'row', gap: 10,
+    backgroundColor: C.bgElevated, borderRadius: 12, padding: 14,
+    borderWidth: 0.5, borderColor: C.border,
+  },
+  logbookDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: C.accent, marginTop: 6 },
+  logbookText: { flex: 1, fontSize: 12.5, color: C.whiteSoft, lineHeight: 19 },
 
   // Bottom sheets
   overlay: {

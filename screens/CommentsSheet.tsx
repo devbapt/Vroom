@@ -10,6 +10,7 @@ import {
   Platform,
   Dimensions,
   Animated,
+  PanResponder,
   Alert,
   ActivityIndicator,
   ListRenderItemInfo,
@@ -135,6 +136,33 @@ export default function CommentsSheet({ postId, visible, onClose, onCommentCount
 
   const slideAnim = useRef(new Animated.Value(700)).current;
   const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
+  // Swipe vers le bas pour fermer — sur le handle et l'en-tête uniquement,
+  // pour ne pas interférer avec le scroll de la liste des commentaires.
+  const dragStartValue = useRef(0);
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, gestureState) => Math.abs(gestureState.dy) > 4,
+      onPanResponderGrant: () => {
+        slideAnim.stopAnimation((value) => { dragStartValue.current = value; });
+      },
+      onPanResponderMove: (_, gestureState) => {
+        const next = dragStartValue.current + gestureState.dy;
+        if (next >= 0) slideAnim.setValue(next);
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        if (gestureState.dy > 100 || gestureState.vy > 0.8) {
+          onCloseRef.current();
+        } else {
+          Animated.spring(slideAnim, { toValue: 0, useNativeDriver: true, damping: 20, stiffness: 220 }).start();
+        }
+      },
+    })
+  ).current;
 
   useEffect(() => {
     const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
@@ -357,15 +385,16 @@ export default function CommentsSheet({ postId, visible, onClose, onCommentCount
         <Animated.View
           style={[styles.sheet, { transform: [{ translateY: slideAnim }] }]}
         >
-          {/* Handle */}
-          <View style={styles.handle} />
+          {/* Handle + en-tête — zone de swipe pour fermer */}
+          <View {...panResponder.panHandlers}>
+            <View style={styles.handle} />
 
-          {/* Header */}
-          <View style={styles.sheetHeader}>
-            <Text style={styles.sheetTitle}>Commentaires</Text>
-            <Pressable onPress={onClose} hitSlop={12}>
-              <Ionicons name="close" size={22} color={C.whiteSoft} />
-            </Pressable>
+            <View style={styles.sheetHeader}>
+              <Text style={styles.sheetTitle}>Commentaires</Text>
+              <Pressable onPress={onClose} hitSlop={12}>
+                <Ionicons name="close" size={22} color={C.whiteSoft} />
+              </Pressable>
+            </View>
           </View>
 
           {/* Comments list */}
@@ -450,7 +479,7 @@ const styles = StyleSheet.create({
     right: 0,
   },
   sheet: {
-    height: SCREEN_HEIGHT * 0.82,
+    height: SCREEN_HEIGHT * 0.68,
     backgroundColor: C.bg,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,

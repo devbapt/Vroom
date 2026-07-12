@@ -215,19 +215,17 @@ function CineDrivePost({ post, index, postHeight, chapterTopOffset, onLike, onSa
         onComment={onComment}
       />
 
-      {/* Description — au-dessus du bloc auteur */}
-      {post.description ? (
-        <View style={styles.descriptionBlock} pointerEvents="box-none">
+      {/* Bloc auteur + description — empilés avec un écart fixe et minimal */}
+      <View style={styles.bottomTextBlock} pointerEvents="box-none">
+        <AuthorBlock post={post} onUserPress={onUserPress} />
+        {post.description ? (
           <ExpandableText
             text={post.description}
             numberOfLines={2}
             style={styles.descriptionText}
           />
-        </View>
-      ) : null}
-
-      {/* Author block — bottom left */}
-      <AuthorBlock post={post} onUserPress={onUserPress} />
+        ) : null}
+      </View>
 
       {/* HUD strip — bottom */}
       <HUDStrip type={post.type} hud={post.hud} />
@@ -274,12 +272,15 @@ const styles = StyleSheet.create({
     backgroundColor: C.pageInactive,
   },
 
-  // Description block — sits above the author block, clear of ActionStack
-  descriptionBlock: {
+  // Bloc auteur + description — un seul conteneur positionné, empilé avec un
+  // écart fixe (gap) pour que l'espacement reste minimal quelle que soit la
+  // longueur de la description (1 ou 2 lignes).
+  bottomTextBlock: {
     position: 'absolute',
-    bottom: 132,
+    bottom: 88,
     left: 18,
     right: 70,
+    gap: 4,
   },
   descriptionText: {
     fontSize: 12.5,
@@ -289,13 +290,11 @@ const styles = StyleSheet.create({
 
   // Author Block
   authorBlock: {
-    position: 'absolute',
-    bottom: 90,
-    left: 18,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    maxWidth: '65%',
+    alignSelf: 'flex-start',
+    maxWidth: '100%',
   },
   authorAvatar: {
     width: 30,

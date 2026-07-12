@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, Pressable,
+  View, StyleSheet, ScrollView, Pressable,
   Dimensions, Share, ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -10,6 +10,7 @@ import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
 import { supabase } from '../supabaseClient';
 import { useAppContext } from '../context';
 import CommentsSheet from './CommentsSheet';
+import AppText from '../components/ui/AppText';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -51,7 +52,7 @@ function ActionBtn({
       onPress={onPress}
     >
       <Ionicons name={icon} size={22} color={active ? C.accent : C.whiteSoft} />
-      <Text style={[styles.actionLabel, active && { color: C.accent }]}>{label}</Text>
+      <AppText weight="semibold" style={[styles.actionLabel, active && { color: C.accent }]}>{label}</AppText>
     </Pressable>
   );
 }
@@ -66,13 +67,15 @@ export default function PostDetailScreen() {
 
   const { user } = useAppContext();
 
-  const [isLiked,       setIsLiked]       = useState(false);
-  const [isSaved,       setIsSaved]       = useState(false);
-  const [likesCount,    setLikesCount]    = useState(0);
-  const [commentsCount, setCommentsCount] = useState(0);
-  const [postOwnerId,   setPostOwnerId]   = useState<string | null>(null);
-  const [loading,       setLoading]       = useState(true);
-  const [commentsOpen,  setCommentsOpen]  = useState(false);
+  const [isLiked,        setIsLiked]        = useState(false);
+  const [isSaved,        setIsSaved]        = useState(false);
+  const [likesCount,     setLikesCount]     = useState(0);
+  const [commentsCount,  setCommentsCount]  = useState(0);
+  const [postOwnerId,    setPostOwnerId]    = useState<string | null>(null);
+  const [posterUsername, setPosterUsername] = useState('');
+  const [loading,        setLoading]        = useState(true);
+  const [commentsOpen,   setCommentsOpen]   = useState(false);
+  const [imageRatio,     setImageRatio]     = useState(4 / 5);
 
   // ── Fetch stats on mount ──────────────────────────────────────────────────
   useEffect(() => {
@@ -80,7 +83,9 @@ export default function PostDetailScreen() {
     const load = async () => {
       setLoading(true);
       const [postRes, likedRes, savedRes] = await Promise.all([
-        supabase.from('posts').select('user_id, likes_count, comments_count').eq('id', id).single(),
+        supabase.from('posts')
+          .select('user_id, likes_count, comments_count, profiles!user_id(username)')
+          .eq('id', id).single(),
         user?.id
           ? supabase.from('post_likes').select('post_id')
               .eq('post_id', id).eq('user_id', user.id).maybeSingle()
@@ -92,6 +97,7 @@ export default function PostDetailScreen() {
       ]);
       if (cancelled) return;
       setPostOwnerId(postRes.data?.user_id ?? null);
+      setPosterUsername((postRes.data as any)?.profiles?.username ?? '');
       setLikesCount(postRes.data?.likes_count ?? 0);
       setCommentsCount(postRes.data?.comments_count ?? 0);
       setIsLiked(!!likedRes.data);
@@ -140,13 +146,17 @@ export default function PostDetailScreen() {
   return (
     <View style={styles.root}>
 
-      {/* ── Image zone ──────────────────────────────────────────────────── */}
+      {/* ── Image zone — ratio réel de la photo, sans bande noire ─────────── */}
       <View style={styles.imageZone}>
         <ExpoImage
           source={image || undefined}
-          style={styles.image}
-          contentFit="contain"
+          style={[styles.image, { aspectRatio: imageRatio }]}
+          contentFit="cover"
           cachePolicy="memory-disk"
+          onLoad={(e) => {
+            const { width: w, height: h } = e.source;
+            if (w && h) setImageRatio(Math.min(Math.max(w / h, 0.66), 1.5));
+          }}
         />
 
         {/* Bouton retour positionné avec l'inset réel — toujours accessible */}
@@ -168,54 +178,17 @@ export default function PostDetailScreen() {
         </Pressable>
       </View>
 
-      {/* ── Contenu ─────────────────────────────────────────────────────── */}
-      <ScrollView
-        style={styles.content}
-        contentContainerStyle={styles.contentContainer}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Titre */}
-        <Text style={styles.title} numberOfLines={2}>{name}</Text>
-
-        {/* Stats */}
-        {loading ? (
-          <ActivityIndicator color={C.accent} style={{ marginVertical: 12 }} />
-        ) : (
-          <View style={styles.statsRow}>
-            <View style={styles.stat}>
-              <Text style={styles.statNum}>{likesCount.toLocaleString('fr-FR')}</Text>
-              <Text style={styles.statLbl}>Likes</Text>
-            </View>
-            <View style={styles.statDiv} />
-            <View style={styles.stat}>
-              <Text style={styles.statNum}>{commentsCount}</Text>
-              <Text style={styles.statLbl}>Commentaires</Text>
-            </View>
-          </View>
-        )}
-
-        {/* Description */}
-        {description ? (
-          <Text style={styles.description}>{description}</Text>
-        ) : null}
-
-        {/* Date */}
-        {date ? (
-          <Text style={styles.date}>{date}</Text>
-        ) : null}
-      </ScrollView>
-
-      {/* ── Barre d'actions — au-dessus de la tab bar ───────────────────── */}
-      <View style={[styles.actionsBar, { paddingBottom: Math.max(insets.bottom, 12) }]}>
+      {/* ── Barre d'actions — juste sous l'image, compteurs exacts sur les icônes ── */}
+      <View style={styles.actionsBar}>
         <ActionBtn
           icon={isLiked ? 'heart' : 'heart-outline'}
-          label={isLiked ? 'Aimé' : 'Like'}
+          label={likesCount.toLocaleString('fr-FR')}
           onPress={handleLike}
           active={isLiked}
         />
         <ActionBtn
           icon="chatbubble-outline"
-          label="Commenter"
+          label={commentsCount.toLocaleString('fr-FR')}
           onPress={() => setCommentsOpen(true)}
         />
         <ActionBtn
@@ -231,6 +204,29 @@ export default function PostDetailScreen() {
         />
       </View>
 
+      {/* ── Contenu — légende compacte ─────────────────────────────────────── */}
+      <ScrollView
+        style={styles.content}
+        contentContainerStyle={[styles.contentContainer, { paddingBottom: Math.max(insets.bottom, 16) }]}
+        showsVerticalScrollIndicator={false}
+      >
+        {loading ? (
+          <ActivityIndicator color={C.accent} style={{ marginVertical: 8 }} />
+        ) : (
+          <>
+            {/* Légende : pseudo en gras + description — les compteurs sont sur les icônes ci-dessus */}
+            {(posterUsername || description) ? (
+              <AppText weight="regular" style={styles.caption}>
+                {posterUsername ? <AppText weight="bold" style={styles.captionUsername}>{posterUsername}  </AppText> : null}
+                {description || name}
+              </AppText>
+            ) : null}
+
+            {date ? <AppText weight="regular" style={styles.date}>{date}</AppText> : null}
+          </>
+        )}
+      </ScrollView>
+
       {/* ── Comments sheet ───────────────────────────────────────────────── */}
       <CommentsSheet
         postId={id}
@@ -244,17 +240,13 @@ export default function PostDetailScreen() {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const IMAGE_HEIGHT = Math.min(SCREEN_WIDTH, 420);
-
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: C.bg },
 
-  // Image zone
+  // Image zone — hauteur dérivée du ratio réel de la photo (imageRatio), pas de valeur fixe
   imageZone: { position: 'relative' },
   image: {
     width: SCREEN_WIDTH,
-    height: IMAGE_HEIGHT,
-    backgroundColor: '#000',
   },
   backBtn: {
     position: 'absolute',
@@ -273,34 +265,23 @@ const styles = StyleSheet.create({
 
   // Content
   content: { flex: 1 },
-  contentContainer: { paddingHorizontal: 18, paddingTop: 16, paddingBottom: 8 },
+  contentContainer: { paddingHorizontal: 18, paddingTop: 12 },
 
-  title: { fontSize: 17, fontWeight: '700', color: C.white, marginBottom: 12 },
+  caption: { fontSize: 13.5, color: C.whiteSoft, lineHeight: 19, marginBottom: 6 },
+  captionUsername: { fontSize: 13.5, color: C.white },
+  date: { fontSize: 10.5, color: C.whiteFaint, opacity: 0.7, marginTop: 2 },
 
-  statsRow: {
-    flexDirection: 'row', alignItems: 'center',
-    paddingVertical: 10, marginBottom: 12,
-    borderTopWidth: 0.5, borderBottomWidth: 0.5,
-    borderTopColor: C.border, borderBottomColor: C.border,
-  },
-  stat:    { flex: 1, alignItems: 'center' },
-  statDiv: { width: 0.5, height: 24, backgroundColor: C.border },
-  statNum: { fontSize: 15, fontWeight: '700', color: C.white, marginBottom: 1 },
-  statLbl: { fontSize: 10, color: C.whiteFaint, letterSpacing: 0.3 },
-
-  description: { fontSize: 14, color: C.whiteSoft, lineHeight: 21, marginBottom: 6 },
-  date:        { fontSize: 11, color: C.whiteFaint },
-
-  // Action bar
+  // Action bar — directement sous l'image
   actionsBar: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    borderTopWidth: 0.5, borderTopColor: C.border,
-    paddingTop: 10,
+    borderTopWidth: 0.5, borderBottomWidth: 0.5,
+    borderTopColor: C.border, borderBottomColor: C.border,
+    paddingTop: 10, paddingBottom: 6,
     backgroundColor: C.bg,
   },
   actionBtn: {
     alignItems: 'center', paddingHorizontal: 10, paddingVertical: 6, gap: 4,
   },
-  actionLabel: { fontSize: 10, fontWeight: '600', color: C.whiteSoft },
+  actionLabel: { fontSize: 10, color: C.whiteSoft },
 });
